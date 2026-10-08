@@ -13,3 +13,8 @@ Include enough information to reproduce and assess the issue, including:
 - potential security impact.
 
 Do not publicly disclose an unresolved vulnerability before coordinated disclosure.
+## Private reporting fallback
+
+If GitHub Private Vulnerability Reporting is unavailable, email security reports to secops@lattix.io.
+
+Do not disclose suspected vulnerabilities through public GitHub issues, discussions, or pull requests.
