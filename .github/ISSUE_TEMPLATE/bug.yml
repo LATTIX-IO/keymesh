@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible defect
+title: "bug: "
+labels:
+  - bug
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not disclose suspected vulnerabilities here.**
+        Use the repository's private vulnerability reporting link instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal steps or code needed to reproduce the problem.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Rust version, OS, target, crate version, enabled features, and relevant dependencies.
+    validations:
+      required: true
