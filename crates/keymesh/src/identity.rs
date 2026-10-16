@@ -108,6 +108,14 @@ fn suspicious_locator_field(bytes: &[u8]) -> bool {
         .any(|m| bytes.windows(m.len()).any(|window| window == *m))
 }
 
+// Opaque provider locators may contain literal or encoded slashes, but dot
+// segments must never be accepted as stable resource identifiers.
+fn has_dot_segments(bytes: &[u8]) -> bool {
+    bytes.split(|b| *b == b'/').any(|segment| {
+        segment == b"." || segment == b".."
+    })
+}
+
 fn validate_resource(value: &str) -> Result<(), IdentityError> {
     if value.is_empty() {
         return Err(IdentityError::Empty);
@@ -122,6 +130,9 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
     {
         return Err(IdentityError::InvalidCharacter);
     }
+    if has_dot_segments(value.as_bytes()) {
+        return Err(IdentityError::InvalidCharacter);
+    }
     // Bare decimal native handles are not durable provider resource identities.
     if value.bytes().all(|b| b.is_ascii_digit()) {
         return Err(IdentityError::InvalidCharacter);
@@ -134,6 +145,9 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
     let mut bytes = value.as_bytes().to_vec();
     for _ in 0..4 {
         bytes.make_ascii_lowercase();
+        if has_dot_segments(&bytes) || bytes.contains(&b'\\') {
+            return Err(IdentityError::InvalidCharacter);
+        }
         if bytes.contains(&b'@') || bytes.contains(&b'#') {
             return Err(IdentityError::CredentialInLocator);
         }
@@ -150,6 +164,9 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
         return Err(IdentityError::InvalidEncoding);
     }
     bytes.make_ascii_lowercase();
+    if has_dot_segments(&bytes) || bytes.contains(&b'\\') {
+        return Err(IdentityError::InvalidCharacter);
+    }
     if suspicious_locator_field(&bytes) {
         return Err(IdentityError::CredentialInLocator);
     }
