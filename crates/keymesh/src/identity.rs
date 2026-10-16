@@ -91,7 +91,7 @@ fn percent_decode(bytes: &[u8]) -> Result<Vec<u8>, IdentityError> {
 fn suspicious_locator_field(bytes: &[u8]) -> bool {
     // Credential fields are forbidden at *every* encoding level. A public
     // pkcs11:token= label is deliberately NOT a credential (RFC 7512).
-    const MARKERS: [&[u8]; 10] = [
+    const MARKERS: [&[u8]; 17] = [
         b"pin-value=",
         b"pin-source=",
         b"access_token=",
@@ -100,8 +100,15 @@ fn suspicious_locator_field(bytes: &[u8]) -> bool {
         b"secret=",
         b"access_key=",
         b"x-amz-security-token=",
+        b"x-amz-signature=",
+        b"x-amz-credential=",
         b"authorization=",
         b"client_secret=",
+        b"sharedaccesssignature=",
+        b"sig=",
+        b"signature=",
+        b"api_key=",
+        b"apikey=",
     ];
     MARKERS
         .iter()
@@ -142,33 +149,51 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
     if value.contains('@') || lowercase.starts_with("alias/") || lowercase.contains(":alias/") {
         return Err(IdentityError::CredentialInLocator);
     }
+    // RFC 7512 permits opaque binary object IDs encoded in the id field,
+    // e.g. pkcs11:token=HSM1;id=%01. Allow nonprintable bytes only there, and
+    // only if that field is the final parameter. No other field may smuggle
+    // encoded controls or non-ASCII through the validation boundary.
+    let binary_id_offset = if lowercase.starts_with("pkcs11:") {
+        let marker = lowercase
+            .rfind(";id=")
+            .map(|index| index + 4)
+            .or_else(|| lowercase.starts_with("pkcs11:id=").then_some(10));
+        marker
+            .filter(|start| !lowercase[*start..].contains(';') && !lowercase[*start..].contains('?'))
+            .and_then(|start| percent_decode(&value.as_bytes()[..start]).ok().map(|v| v.len()))
+    } else {
+        None
+    };
+
     let mut bytes = value.as_bytes().to_vec();
-    for _ in 0..4 {
-        bytes.make_ascii_lowercase();
-        if has_dot_segments(&bytes) || bytes.contains(&b'\\') {
-            return Err(IdentityError::InvalidCharacter);
-        }
-        if bytes.contains(&b'@') || bytes.contains(&b'#') {
-            return Err(IdentityError::CredentialInLocator);
-        }
-        if suspicious_locator_field(&bytes) {
-            return Err(IdentityError::CredentialInLocator);
-        }
-        if !bytes.contains(&b'%') {
-            return Ok(());
-        }
-        bytes = percent_decode(&bytes)?;
-    }
-    // Multiple nested encodings are never necessary in a normal provider ID.
-    if bytes.contains(&b'%') {
-        return Err(IdentityError::InvalidEncoding);
-    }
     bytes.make_ascii_lowercase();
+    if suspicious_locator_field(&bytes) {
+        return Err(IdentityError::CredentialInLocator);
+    }
+    // Only one native percent-decoding layer is permitted. Reject nested
+    // encodings instead of interpreting arbitrary levels, preventing
+    // %250A -> %0A -> newline and encoded credential-name bypass.
+    if bytes.contains(&b'%') {
+        bytes = percent_decode(&bytes)?;
+        if bytes.contains(&b'%') {
+            return Err(IdentityError::InvalidEncoding);
+        }
+    }
     if has_dot_segments(&bytes) || bytes.contains(&b'\\') {
         return Err(IdentityError::InvalidCharacter);
     }
+    if bytes.contains(&b'@') || bytes.contains(&b'#') {
+        return Err(IdentityError::CredentialInLocator);
+    }
     if suspicious_locator_field(&bytes) {
         return Err(IdentityError::CredentialInLocator);
+    }
+    for (index, byte) in bytes.iter().enumerate() {
+        if (!byte.is_ascii() || byte.is_ascii_whitespace() || byte.is_ascii_control())
+            && binary_id_offset.is_none_or(|start| index < start)
+        {
+            return Err(IdentityError::InvalidCharacter);
+        }
     }
     Ok(())
 }
