@@ -6,8 +6,8 @@
 
 use crate::binding::{KeyRef, KeySelector};
 use crate::identity::{
-    IdentityError, LogicalKeyId, MaterialRevisionId, ProviderInstanceId, ProviderNamespace,
-    ProviderResourceId, ProviderVersionId, MAX_RESOURCE_BYTES,
+    IdentityError, LogicalKeyId, MAX_RESOURCE_BYTES, MaterialRevisionId, ProviderInstanceId,
+    ProviderNamespace, ProviderResourceId, ProviderVersionId,
 };
 use core::fmt;
 use core::fmt::Write as _;
@@ -175,32 +175,26 @@ impl FromStr for KeyRef {
             return Err(KeyRefUriError::InvalidEncoding);
         }
         let mut segments = input[PREFIX.len()..].split('/');
-        let provider = ProviderInstanceId::parse(
-            segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-        )
-        .map_err(KeyRefUriError::InvalidIdentity)?;
-        let namespace = ProviderNamespace::parse(
-            segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-        )
-        .map_err(KeyRefUriError::InvalidIdentity)?;
-        let key = LogicalKeyId::parse(
-            segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-        )
-        .map_err(KeyRefUriError::InvalidIdentity)?;
+        let provider =
+            ProviderInstanceId::parse(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)
+                .map_err(KeyRefUriError::InvalidIdentity)?;
+        let namespace =
+            ProviderNamespace::parse(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)
+                .map_err(KeyRefUriError::InvalidIdentity)?;
+        let key = LogicalKeyId::parse(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)
+            .map_err(KeyRefUriError::InvalidIdentity)?;
         let selector_name = segments.next().ok_or(KeyRefUriError::InvalidStructure)?;
         let selector = match selector_name {
             "active" => KeySelector::Active,
             "latest" => KeySelector::Latest,
             "resource" => {
-                let resource = decode_resource(
-                    segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-                )?;
+                let resource =
+                    decode_resource(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)?;
                 KeySelector::StableResource(resource)
             }
             "version" => {
-                let resource = decode_resource(
-                    segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-                )?;
+                let resource =
+                    decode_resource(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)?;
                 let version = ProviderVersionId::parse(
                     segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
                 )
@@ -208,9 +202,8 @@ impl FromStr for KeyRef {
                 KeySelector::ExactProviderVersion { resource, version }
             }
             "material" => {
-                let resource = decode_resource(
-                    segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
-                )?;
+                let resource =
+                    decode_resource(segments.next().ok_or(KeyRefUriError::InvalidStructure)?)?;
                 let version = ProviderVersionId::parse(
                     segments.next().ok_or(KeyRefUriError::InvalidStructure)?,
                 )
