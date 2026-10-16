@@ -202,7 +202,7 @@ fn deterministic_roundtrips_and_adversarial_mutations() {
             scope(&namespace),
             logical("project-key"),
             KeySelector::StableResource(resource(&format!(
-                "urn:untrusted:source/{i}:%25slash"
+                "urn:untrusted:source/{i}:%2Fslash"
             ))),
         );
         let text = reference.to_string();
