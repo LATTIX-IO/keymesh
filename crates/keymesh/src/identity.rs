@@ -47,9 +47,13 @@ fn validate_label(value: &str) -> Result<(), IdentityError> {
     if value.len() > MAX_IDENTIFIER_BYTES {
         return Err(IdentityError::TooLong);
     }
-    if value == "." || value == ".." || !value.as_bytes().iter().all(|b| {
-        b.is_ascii_alphanumeric() || matches!(*b, b'-' | b'_' | b'.')
-    }) {
+    if value == "."
+        || value == ".."
+        || !value
+            .as_bytes()
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(*b, b'-' | b'_' | b'.'))
+    {
         return Err(IdentityError::InvalidCharacter);
     }
     Ok(())
@@ -88,11 +92,20 @@ fn suspicious_locator_field(bytes: &[u8]) -> bool {
     // Credential fields are forbidden at *every* encoding level. A public
     // pkcs11:token= label is deliberately NOT a credential (RFC 7512).
     const MARKERS: [&[u8]; 10] = [
-        b"pin-value=", b"pin-source=", b"access_token=", b"bearer_token=",
-        b"password=", b"secret=", b"access_key=", b"x-amz-security-token=",
-        b"authorization=", b"client_secret=",
+        b"pin-value=",
+        b"pin-source=",
+        b"access_token=",
+        b"bearer_token=",
+        b"password=",
+        b"secret=",
+        b"access_key=",
+        b"x-amz-security-token=",
+        b"authorization=",
+        b"client_secret=",
     ];
-    MARKERS.iter().any(|m| bytes.windows(m.len()).any(|window| window == *m))
+    MARKERS
+        .iter()
+        .any(|m| bytes.windows(m.len()).any(|window| window == *m))
 }
 
 fn validate_resource(value: &str) -> Result<(), IdentityError> {
@@ -102,7 +115,11 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
     if value.len() > MAX_RESOURCE_BYTES {
         return Err(IdentityError::TooLong);
     }
-    if !value.is_ascii() || value.bytes().any(|b| b.is_ascii_whitespace() || b.is_ascii_control() || matches!(b, b'\\' | b'#')) {
+    if !value.is_ascii()
+        || value
+            .bytes()
+            .any(|b| b.is_ascii_whitespace() || b.is_ascii_control() || matches!(b, b'\\' | b'#'))
+    {
         return Err(IdentityError::InvalidCharacter);
     }
     // Bare decimal native handles are not durable provider resource identities.
@@ -169,11 +186,26 @@ macro_rules! make_label {
     };
 }
 
-make_label!(ProviderInstanceId, "A host-registered provider adapter instance; not a provider brand.");
-make_label!(ProviderNamespace, "Authoritative host-supplied tenant, account, or partition namespace.");
-make_label!(LogicalKeyId, "Stable application key-group identity, distinct from any provider version.");
-make_label!(ProviderVersionId, "Provider-addressable key version; NOT proof of exact material revision.");
-make_label!(MaterialRevisionId, "Opaque material revision identifier; metadata alone does not mean selectable.");
+make_label!(
+    ProviderInstanceId,
+    "A host-registered provider adapter instance; not a provider brand."
+);
+make_label!(
+    ProviderNamespace,
+    "Authoritative host-supplied tenant, account, or partition namespace."
+);
+make_label!(
+    LogicalKeyId,
+    "Stable application key-group identity, distinct from any provider version."
+);
+make_label!(
+    ProviderVersionId,
+    "Provider-addressable key version; NOT proof of exact material revision."
+);
+make_label!(
+    MaterialRevisionId,
+    "Opaque material revision identifier; metadata alone does not mean selectable."
+);
 
 /// The library's key-version identifier means a provider-addressable version,
 /// never an independently attested physical key-material revision.
