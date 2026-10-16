@@ -34,7 +34,9 @@ fn versioned_uri_golden_fixtures_are_exact_and_fail_closed() {
         if line.starts_with('#') || line.is_empty() {
             continue;
         }
-        let (kind, text) = line.split_once('\t').unwrap_or_else(|| panic!("fixture must have one tab"));
+        let (kind, text) = line
+            .split_once('\t')
+            .unwrap_or_else(|| panic!("fixture must have one tab"));
         match kind {
             "valid" => {
                 accepted += 1;
