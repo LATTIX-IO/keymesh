@@ -189,10 +189,9 @@ fn native_credentials_and_decoded_controls_are_rejected() {
     }
     // RFC 7512 binary object identifiers remain addressable when encoded
     // precisely once in the terminal PKCS#11 id= parameter.
-    assert!(ProviderResourceId::parse(
-        "pkcs11:token=HSM1;object=my-key;type=private;id=%01"
-    )
-    .is_ok());
+    assert!(
+        ProviderResourceId::parse("pkcs11:token=HSM1;object=my-key;type=private;id=%01").is_ok()
+    );
 }
 
 #[test]
