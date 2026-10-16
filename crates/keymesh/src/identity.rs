@@ -105,6 +105,10 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
     if !value.is_ascii() || value.bytes().any(|b| b.is_ascii_whitespace() || b.is_ascii_control() || matches!(b, b'\\' | b'#')) {
         return Err(IdentityError::InvalidCharacter);
     }
+    // Bare decimal native handles are not durable provider resource identities.
+    if value.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(IdentityError::InvalidCharacter);
+    }
     // RFC 3986 userinfo is not a safe stable key identifier. Fail closed.
     let lowercase = value.to_ascii_lowercase();
     if value.contains('@') || lowercase.starts_with("alias/") || lowercase.contains(":alias/") {
