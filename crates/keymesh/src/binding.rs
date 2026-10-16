@@ -4,8 +4,11 @@
 //! adapter must supply authoritative resolution from its own credential and
 //! authorization boundary, and dispatch using the returned `BoundKey` target.
 
+use crate::identity::{
+    LogicalKeyId, MaterialRevisionId, ProviderInstanceId, ProviderNamespace, ProviderResourceId,
+    ProviderVersionId,
+};
 use core::fmt;
-use crate::identity::{LogicalKeyId, MaterialRevisionId, ProviderInstanceId, ProviderNamespace, ProviderResourceId, ProviderVersionId};
 
 /// A key selector is an input requirement, not proof of which key was used.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,17 +48,35 @@ pub struct KeyRef {
 }
 impl KeyRef {
     /// Build a scope-qualified logical reference; does not authorize it.
-    pub fn new(provider: ProviderInstanceId, namespace: ProviderNamespace, logical_key: LogicalKeyId, selector: KeySelector) -> Self {
-        Self { provider, namespace, logical_key, selector }
+    pub fn new(
+        provider: ProviderInstanceId,
+        namespace: ProviderNamespace,
+        logical_key: LogicalKeyId,
+        selector: KeySelector,
+    ) -> Self {
+        Self {
+            provider,
+            namespace,
+            logical_key,
+            selector,
+        }
     }
     /// Requested provider instance.
-    pub fn provider(&self) -> &ProviderInstanceId { &self.provider }
+    pub fn provider(&self) -> &ProviderInstanceId {
+        &self.provider
+    }
     /// Requested namespace, not proof of authenticated tenant identity.
-    pub fn namespace(&self) -> &ProviderNamespace { &self.namespace }
+    pub fn namespace(&self) -> &ProviderNamespace {
+        &self.namespace
+    }
     /// Requested logical key.
-    pub fn logical_key(&self) -> &LogicalKeyId { &self.logical_key }
+    pub fn logical_key(&self) -> &LogicalKeyId {
+        &self.logical_key
+    }
     /// Requested key selector.
-    pub fn selector(&self) -> &KeySelector { &self.selector }
+    pub fn selector(&self) -> &KeySelector {
+        &self.selector
+    }
 }
 
 /// Provider and namespace fixed by the caller's *authenticated host* context.
@@ -69,12 +90,19 @@ pub struct HostScope {
 impl HostScope {
     /// Wrap a previously authenticated/authorized provider namespace mapping.
     pub fn new(provider: ProviderInstanceId, namespace: ProviderNamespace) -> Self {
-        Self { provider, namespace }
+        Self {
+            provider,
+            namespace,
+        }
     }
     /// The host-authorized provider instance.
-    pub fn provider(&self) -> &ProviderInstanceId { &self.provider }
+    pub fn provider(&self) -> &ProviderInstanceId {
+        &self.provider
+    }
     /// The host-authorized namespace.
-    pub fn namespace(&self) -> &ProviderNamespace { &self.namespace }
+    pub fn namespace(&self) -> &ProviderNamespace {
+        &self.namespace
+    }
 }
 
 /// Only concrete, explicitly specified dispatch targets can pass preflight.
@@ -84,7 +112,7 @@ pub enum DispatchTarget {
     /// A stable provider resource ID, which may rotate material beneath it.
     StableResource(ProviderResourceId),
     /// A concrete provider-addressable version; actual material is not independently attested.
-    ProviderVersion { 
+    ProviderVersion {
         /// The stable resource.
         resource: ProviderResourceId,
         /// The selectable version.
@@ -106,26 +134,33 @@ impl DispatchTarget {
     pub fn resource(&self) -> &ProviderResourceId {
         match self {
             Self::StableResource(id) => id,
-            Self::ProviderVersion {resource, ..} | Self::MaterialVersion {resource, ..} => resource,
+            Self::ProviderVersion { resource, .. } | Self::MaterialVersion { resource, .. } => {
+                resource
+            }
         }
     }
     /// Provider-addressable version when dispatch is bound to one.
     pub fn provider_version(&self) -> Option<&ProviderVersionId> {
         match self {
-            Self::ProviderVersion {version, ..} | Self::MaterialVersion {version, ..} => Some(version),
+            Self::ProviderVersion { version, .. } | Self::MaterialVersion { version, .. } => {
+                Some(version)
+            }
             Self::StableResource(_) => None,
         }
     }
     /// Selectable material revision, if supported; NOT observed-only metadata.
     pub fn selected_material_revision(&self) -> Option<&MaterialRevisionId> {
-        match self { Self::MaterialVersion {revision, ..} => Some(revision), _ => None }
+        match self {
+            Self::MaterialVersion { revision, .. } => Some(revision),
+            _ => None,
+        }
     }
     /// Claimed provider binding level, to be verified by the adapter for each operation.
     pub fn assurance(&self) -> BindingAssurance {
         match self {
             Self::StableResource(_) => BindingAssurance::StableResourceBound,
-            Self::ProviderVersion {..} => BindingAssurance::ProviderVersionBound,
-            Self::MaterialVersion {..} => BindingAssurance::MaterialVersionBound,
+            Self::ProviderVersion { .. } => BindingAssurance::ProviderVersionBound,
+            Self::MaterialVersion { .. } => BindingAssurance::MaterialVersionBound,
         }
     }
 }
@@ -174,8 +209,19 @@ pub struct ResolvedKey {
 }
 impl ResolvedKey {
     /// Create a provider-specific resolution proposal; never pass an unresolved alias.
-    pub fn new(provider: ProviderInstanceId, namespace: ProviderNamespace, logical_key: LogicalKeyId, target: DispatchTarget) -> Self {
-        Self { provider, namespace, logical_key, target, observed_material_revision: None }
+    pub fn new(
+        provider: ProviderInstanceId,
+        namespace: ProviderNamespace,
+        logical_key: LogicalKeyId,
+        target: DispatchTarget,
+    ) -> Self {
+        Self {
+            provider,
+            namespace,
+            logical_key,
+            target,
+            observed_material_revision: None,
+        }
     }
     /// Attach observational provider metadata; does NOT upgrade dispatch assurance.
     pub fn with_observed_material_revision(mut self, observed: MaterialRevisionId) -> Self {
@@ -183,9 +229,13 @@ impl ResolvedKey {
         self
     }
     /// The resolved native dispatch target, never an alias.
-    pub fn dispatch_target(&self) -> &DispatchTarget { &self.target }
+    pub fn dispatch_target(&self) -> &DispatchTarget {
+        &self.target
+    }
     /// Any provider-reported material revision observed separately from selection.
-    pub fn observed_material_revision(&self) -> Option<&MaterialRevisionId> { self.observed_material_revision.as_ref() }
+    pub fn observed_material_revision(&self) -> Option<&MaterialRevisionId> {
+        self.observed_material_revision.as_ref()
+    }
 }
 
 /// Scope and binding error. Invalid values are not copied into error messages.
@@ -231,15 +281,25 @@ pub struct BoundKey<'a> {
 }
 impl<'a> BoundKey<'a> {
     /// Concrete native dispatch target; no aliases or provider auto-selection.
-    pub fn dispatch_target(&self) -> &'a DispatchTarget { &self.resolved.target }
+    pub fn dispatch_target(&self) -> &'a DispatchTarget {
+        &self.resolved.target
+    }
     /// Provider-reported assurance level of this target.
-    pub fn assurance(&self) -> BindingAssurance { self.resolved.target.assurance() }
+    pub fn assurance(&self) -> BindingAssurance {
+        self.resolved.target.assurance()
+    }
     /// Provider instance bound by preflight.
-    pub fn provider(&self) -> &ProviderInstanceId { &self.resolved.provider }
+    pub fn provider(&self) -> &ProviderInstanceId {
+        &self.resolved.provider
+    }
     /// Authorized namespace bound by preflight.
-    pub fn namespace(&self) -> &ProviderNamespace { &self.resolved.namespace }
+    pub fn namespace(&self) -> &ProviderNamespace {
+        &self.resolved.namespace
+    }
     /// Logical key bound by preflight.
-    pub fn logical_key(&self) -> &LogicalKeyId { &self.resolved.logical_key }
+    pub fn logical_key(&self) -> &LogicalKeyId {
+        &self.resolved.logical_key
+    }
 }
 
 /// Validate a proposed resolution against host-approved scope, requested key,
@@ -267,7 +327,12 @@ impl<'a> BoundKey<'a> {
 ///     .unwrap_or_else(|_| unreachable!());
 /// assert_eq!(bound.assurance(), BindingAssurance::StableResourceBound);
 /// ```
-pub fn preflight_bind<'a>(reference: &KeyRef, authorized: &HostScope, resolved: &'a ResolvedKey, required: RequiredAssurance) -> Result<BoundKey<'a>, BindingError> {
+pub fn preflight_bind<'a>(
+    reference: &KeyRef,
+    authorized: &HostScope,
+    resolved: &'a ResolvedKey,
+    required: RequiredAssurance,
+) -> Result<BoundKey<'a>, BindingError> {
     if reference.provider != authorized.provider || resolved.provider != authorized.provider {
         return Err(BindingError::ProviderMismatch);
     }
@@ -282,7 +347,7 @@ pub fn preflight_bind<'a>(reference: &KeyRef, authorized: &HostScope, resolved: 
         return Err(BindingError::UnsupportedVersionAssurance);
     }
     match &reference.selector {
-        KeySelector::Active | KeySelector::Latest => {},
+        KeySelector::Active | KeySelector::Latest => {}
         KeySelector::StableResource(resource) => {
             if target.resource() != resource {
                 return Err(BindingError::ResourceMismatch);
@@ -293,22 +358,26 @@ pub fn preflight_bind<'a>(reference: &KeyRef, authorized: &HostScope, resolved: 
                 return Err(BindingError::ResourceMismatch);
             }
             match target.provider_version() {
-                Some(actual) if actual == version => {},
+                Some(actual) if actual == version => {}
                 Some(_) => return Err(BindingError::VersionMismatch),
                 None => return Err(BindingError::UnsupportedVersionAssurance),
             }
         }
-        KeySelector::ExactMaterialRevision { resource, version, revision } => {
+        KeySelector::ExactMaterialRevision {
+            resource,
+            version,
+            revision,
+        } => {
             if target.resource() != resource {
                 return Err(BindingError::ResourceMismatch);
             }
             match target.provider_version() {
-                Some(actual) if actual == version => {},
+                Some(actual) if actual == version => {}
                 Some(_) => return Err(BindingError::VersionMismatch),
                 None => return Err(BindingError::UnsupportedVersionAssurance),
             }
             match target.selected_material_revision() {
-                Some(actual) if actual == revision => {},
+                Some(actual) if actual == revision => {}
                 Some(_) => return Err(BindingError::MaterialRevisionMismatch),
                 None => return Err(BindingError::UnsupportedVersionAssurance),
             }
