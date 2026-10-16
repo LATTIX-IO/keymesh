@@ -2,8 +2,8 @@
 changelog_update = true
 changelog_path = "./CHANGELOG.md"
 dependencies_update = true
-git_release_enable = true
-git_tag_enable = true
+git_release_enable = false
+git_tag_enable = false
 semver_check = true
 release_always = false
 pr_branch_prefix = "release-plz-"
