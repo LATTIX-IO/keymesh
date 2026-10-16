@@ -12,6 +12,23 @@ Project website: https://lattix.io
 is implemented yet. Public APIs will remain unstable until a deliberately approved
 release. The `keymesh` crate is explicitly **not publishable** at this stage.
 
+## Security and key-versioning design (KM-01)
+
+The security baseline is specified in [THREAT_MODEL.md](THREAT_MODEL.md)
+and the implementation decisions below:
+
+- [ADR-0001: Key identity and material-version assurance](docs/adr/0001-key-identity-and-version-assurance.md)
+- [ADR-0002: Crypto operations and failure semantics](docs/adr/0002-operation-and-failure-semantics.md)
+- [Threat-to-test traceability](docs/security/traceability.md)
+
+The [version-assurance fixture corpus](tests/fixtures/key_binding_contract_v1.json)
+and its [reference decision tests](tests/test_key_binding_contract.py) describe
+expected allow/deny decisions for cross-provider/tenant routing, alias races,
+exact vs opaque key-material versions, credentials, and cryptographic operation
+classification. These are **reference-model tests**, not deployed Rust/provider
+enforcement or an HSM/KMS certification. Implementations in subsequent
+increments must replay equivalent fixtures at their real operation boundary.
+
 ## Crates
 
 - keymesh
