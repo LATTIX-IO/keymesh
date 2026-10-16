@@ -8,8 +8,8 @@ Project website: https://lattix.io
 
 ## Status
 
-**Unreleased bootstrap.** No provider-neutral key-management API or provider adapter
-is implemented yet. Public APIs will remain unstable until a deliberately approved
+**Unreleased bootstrap.** The typed identity and URI contract APIs exist, but
+no cryptographic provider operation interface or backend is implemented yet. Public APIs will remain unstable until a deliberately approved
 release. The `keymesh` crate is explicitly **not publishable** at this stage.
 
 ## Security and key-versioning design (KM-01)
@@ -41,7 +41,7 @@ python3 scripts/generate_km02_contract.py --check
 
 Public APIs:
 
-- `ProviderInstanceId`, `ProviderNamespace`, `LogicalKeyId`, `ProviderResourceId`, `ProviderVersionId` (`KeyVersionId`), `MaterialRevisionId`: distinct, bounded identifier types; strict ASCII labels; native locator validation rejects obvious secret-bearing fields and malformed encodings. URI canonicalization is **not** implemented yet (KM-03).
+- `ProviderInstanceId`, `ProviderNamespace`, `LogicalKeyId`, `ProviderResourceId`, `ProviderVersionId` (`KeyVersionId`), `MaterialRevisionId`: distinct, bounded identifier types; strict ASCII labels; native locator validation rejects obvious secret-bearing fields and malformed encodings. Canonical KeyRef URI v1 parsing/formatting is available (KM-03). Native resource locators remain provider-specific and subject to separate adapter validation.
 - `KeyRef` + `KeySelector`: logical reference distinct from `Active`, `Latest`, stable-resource, exact provider-version, and exact material-revision selectors.
 - `DispatchTarget`: only concrete resource/version/material-revision targets; no mutable alias or native session-handle variant.
 - `HostScope` and `preflight_bind`: compare host-authorized scope, requested logical key/resource, required assurance and concrete provider resolution; reject unsupported exact-version constraints instead of falling back.
@@ -54,6 +54,28 @@ Public APIs:
 Rust regression tests cover negative collisions, cross-provider/tenant substitution, material-version downgrades, stale Azure/Vault key versions, bounded inputs, secret-bearing PKCS#11 locators, and a standalone example. `scripts/generate_km02_contract.py` projects **14 identity-specific cases** from the KM-01 JSON fixtures into a generated `.inc` expression consumed directly by the Rust integration test. CI verifies this projection has not drifted; operation, policy, authentication and destructive-mutation cases remain owned by later increments.
 
 Because these preflight checks require an adapter to honor the bound target, passing these tests is not proof that any remote cryptographic operation is secure.
+## KM-03: canonical versioned KeyRef URI
+
+KeyRef references can now be safely rendered and parsed as a canonical,
+ASCII-only `keymesh://v1/` representation with explicit active, latest,
+stable resource, provider-version, and exact material-revision selectors.
+Opaque native provider locators are bounded and percent-encoded as single path
+components. Untrusted URI strings are **not** credentials or authorization.
+
+See [the normative v1 URI specification](docs/specs/keyref-uri-v1.md),
+[golden and malicious vectors](tests/fixtures/keyref_uri_v1.tsv), and the
+[parser tests](crates/keymesh/tests/keyref_uri.rs).
+
+```sh
+cargo run --example keyref_uri
+cargo test --workspace --all-features
+# Optional opt-in fuzz harness: cd fuzz && cargo fuzz run keyref_uri
+```
+
+The URI parser performs no I/O or cryptography. A parsed reference still
+requires host-authorized `HostScope` and actual provider-side binding before
+it can be used for an operation.
+
 ## Crates
 
 - keymesh

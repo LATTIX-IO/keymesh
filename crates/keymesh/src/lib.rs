@@ -9,6 +9,7 @@
 
 mod binding;
 mod identity;
+mod uri;
 
 pub use binding::{
     BindingAssurance, BindingError, BoundKey, DispatchTarget, HostScope, KeyRef, KeySelector,
@@ -19,3 +20,5 @@ pub use identity::{
     MaterialRevisionId, ProviderInstanceId, ProviderNamespace, ProviderResourceId,
     ProviderVersionId,
 };
+
+pub use uri::{KeyRefUriError, MAX_KEY_REF_URI_BYTES};

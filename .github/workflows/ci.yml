@@ -63,6 +63,9 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-features --locked
 
+      - name: Execute KeyRef URI consumer example
+        run: cargo run --locked -p keymesh --example keyref_uri
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -82,3 +85,27 @@ jobs:
 
       - name: SemVer compatibility
         run: cargo semver-checks check-release --workspace --all-features
+
+  rust-msrv:
+    name: Rust 1.85 MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install declared minimum Rust 1.85.0
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # pinned action
+        with:
+          toolchain: 1.85.0
+
+      - name: Check workspace and examples at MSRV
+        run: cargo check --workspace --all-targets --all-features --locked
+
+      - name: Test workspace at MSRV
+        run: cargo test --workspace --all-features --locked
+
+      - name: Execute KeyRef URI consumer example at MSRV
+        run: cargo run --locked -p keymesh --example keyref_uri
