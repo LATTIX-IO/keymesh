@@ -11,11 +11,11 @@ mod binding;
 mod identity;
 
 pub use binding::{
-    BindingAssurance, BindingError, BoundKey, DispatchTarget, HostScope, KeyRef,
-    KeySelector, RequiredAssurance, ResolvedKey, preflight_bind,
+    BindingAssurance, BindingError, BoundKey, DispatchTarget, HostScope, KeyRef, KeySelector,
+    RequiredAssurance, ResolvedKey, preflight_bind,
 };
 pub use identity::{
-    IdentityError, KeyVersionId, LogicalKeyId, MaterialRevisionId,
-    ProviderInstanceId, ProviderNamespace, ProviderResourceId, ProviderVersionId,
-    MAX_IDENTIFIER_BYTES, MAX_RESOURCE_BYTES,
+    IdentityError, KeyVersionId, LogicalKeyId, MAX_IDENTIFIER_BYTES, MAX_RESOURCE_BYTES,
+    MaterialRevisionId, ProviderInstanceId, ProviderNamespace, ProviderResourceId,
+    ProviderVersionId,
 };
