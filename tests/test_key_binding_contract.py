@@ -20,7 +20,7 @@ BINDING_STRENGTH = {
     "material_version": 3,
 }
 VALID_DISPATCH = {"stable_resource", "provider_version", "material_version"}
-SENSITIVE_MARKERS = ("pin-value=", "pin-source=", "token=", "password=", "secret=", "access_key=")
+SENSITIVE_MARKERS = ("pin-value=", "pin-source=", "access_token=", "bearer_token=", "password=", "secret=", "access_key=", "x-amz-security-token=")
 
 
 def contract_decision(request: dict, bound: dict) -> str:
@@ -139,6 +139,13 @@ class ContractFixtureTests(unittest.TestCase):
             for dispatch in ("alias", "stable_resource", "provider_version", "material_version"):
                 with self.subTest(category=category, dispatch=dispatch):
                     self.assertEqual(contract_decision(request, {**base, "assurance": category, "dispatch_kind": dispatch}), "deny")
+
+    def test_pkcs11_token_label_is_not_a_credential(self) -> None:
+        """RFC 7512 token= names a PKCS#11 token, not an access token."""
+        request = self.data["defaults"]["request"]
+        bound = {**self.data["defaults"]["bound"],
+                 "provider_locator": "pkcs11:token=HSM1;object=my-key;type=private;id=%01"}
+        self.assertEqual(contract_decision(request, bound), "allow")
 
     def test_mutation_property_secrets_in_locator_denied(self) -> None:
         request = self.data["defaults"]["request"]
