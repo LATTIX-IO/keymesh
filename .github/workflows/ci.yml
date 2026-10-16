@@ -28,6 +28,9 @@ jobs:
       - name: Test negative publication scenarios
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
+      - name: Validate generated KM-02 Rust fixtures
+        run: python3 scripts/generate_km02_contract.py --check
+
   rust-checks:
     name: Rust checks
     runs-on: ubuntu-latest
