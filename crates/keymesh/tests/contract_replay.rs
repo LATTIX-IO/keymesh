@@ -35,21 +35,39 @@ fn label<T>(value: &str, parse: fn(&str) -> Result<T, IdentityError>) -> T {
 #[test]
 fn km01_identity_version_contract_replay() {
     for case in CASES {
-        let p = label(case.req_provider.unwrap_or_default(), ProviderInstanceId::parse);
-        let ns = label(case.req_namespace.unwrap_or_default(), ProviderNamespace::parse);
+        let p = label(
+            case.req_provider.unwrap_or_default(),
+            ProviderInstanceId::parse,
+        );
+        let ns = label(
+            case.req_namespace.unwrap_or_default(),
+            ProviderNamespace::parse,
+        );
         let key = label(case.req_logical.unwrap_or_default(), LogicalKeyId::parse);
-        let resource = label(case.req_resource.unwrap_or_default(), ProviderResourceId::parse);
+        let resource = label(
+            case.req_resource.unwrap_or_default(),
+            ProviderResourceId::parse,
+        );
         let selector = match case.selector {
             Some("active") => KeySelector::Active,
             Some("resource") => KeySelector::StableResource(resource),
             Some("version") => KeySelector::ExactProviderVersion {
                 resource,
-                version: label(case.req_version.unwrap_or_default(), ProviderVersionId::parse),
+                version: label(
+                    case.req_version.unwrap_or_default(),
+                    ProviderVersionId::parse,
+                ),
             },
             Some("material") => KeySelector::ExactMaterialRevision {
                 resource,
-                version: label(case.req_version.unwrap_or_default(), ProviderVersionId::parse),
-                revision: label(case.req_material.unwrap_or_default(), MaterialRevisionId::parse),
+                version: label(
+                    case.req_version.unwrap_or_default(),
+                    ProviderVersionId::parse,
+                ),
+                revision: label(
+                    case.req_material.unwrap_or_default(),
+                    MaterialRevisionId::parse,
+                ),
             },
             _ => panic!("unsupported fixture selector"),
         };
@@ -90,17 +108,12 @@ fn km01_identity_version_contract_replay() {
                 case.bound_namespace.unwrap_or_default(),
                 ProviderNamespace::parse,
             ),
-            label(
-                case.bound_logical.unwrap_or_default(),
-                LogicalKeyId::parse,
-            ),
+            label(case.bound_logical.unwrap_or_default(), LogicalKeyId::parse),
             target,
         );
         if let Some(revision) = case.observed_material {
-            actual = actual.with_observed_material_revision(label(
-                revision,
-                MaterialRevisionId::parse,
-            ));
+            actual =
+                actual.with_observed_material_revision(label(revision, MaterialRevisionId::parse));
         }
         let required = match case.req_binding {
             Some("stable_resource") => RequiredAssurance::StableResource,
