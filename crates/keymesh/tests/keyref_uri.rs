@@ -63,7 +63,7 @@ fn versioned_uri_golden_fixtures_are_exact_and_fail_closed() {
         }
     }
     assert_eq!(accepted, 9);
-    assert_eq!(rejected, 35);
+    assert_eq!(rejected, 41);
 }
 
 #[test]
@@ -170,6 +170,29 @@ fn invalid_uris_never_echo_secrets_into_errors() {
     let shown = format!("{error:?} {error}");
     assert!(!shown.contains("SUPERSECRET123"));
     assert!(matches!(error, KeyRefUriError::InvalidResource(_)));
+}
+
+#[test]
+fn native_credentials_and_decoded_controls_are_rejected() {
+    let forbidden = [
+        "https://s3.amazonaws.com/key?X-Amz-Signature=SUPERSECRET",
+        "https://account.blob.core.windows.net/c/b?sv=2026&sig=SUPERSECRET",
+        "https://s3.amazonaws.com/key?X-Amz-Credential=ACCESSKEY",
+        "foo%0Abar",
+        "foo%C3%A9",
+        "foo%250Abar",
+        "pkcs11:token=%0A;object=my-key;id=%01",
+        "pkcs11:token=HSM1;object=my-key;id=%01;object=%0A",
+    ];
+    for native in forbidden {
+        assert!(ProviderResourceId::parse(native).is_err());
+    }
+    // RFC 7512 binary object identifiers remain addressable when encoded
+    // precisely once in the terminal PKCS#11 id= parameter.
+    assert!(ProviderResourceId::parse(
+        "pkcs11:token=HSM1;object=my-key;type=private;id=%01"
+    )
+    .is_ok());
 }
 
 #[test]
