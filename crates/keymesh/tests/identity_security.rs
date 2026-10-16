@@ -77,6 +77,7 @@ fn opaque_locator_accepts_provider_uris_and_rejects_secret_bearing_values() {
         "pkcs11:object=x?%70in-value%3d1234", "pkcs11:object=x?%2570in-value%253d1234",
         "arn:aws:kms:us-east-1:111122223333:alias/payments",
         "alias/payments", "https://user%40vault.example/keys/test",
+        "42", "000000",
         "aws:secret=example", "https://host/vault#fragment", "https://host/bad path",
         "https://vault.example/token?access_token=SECRET",
     ] {
