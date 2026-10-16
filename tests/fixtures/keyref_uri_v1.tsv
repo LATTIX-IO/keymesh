@@ -44,3 +44,9 @@ invalid	keymesh://v1/p/t/k/resource/arn%3Aaws%3Akms%3Aus-east-1%3A111122223333%3
 invalid	keymesh://v1/p/ténant/k/active
 invalid	pkcs11:token=HSM1;object=key
 invalid	keymesh://v1/p/t/k/resource/foo%25ZZ
+invalid	keymesh://v1/p/t/k/resource/https%3A%2F%2Fs3.amazonaws.com%2Fkey%3FX-Amz-Signature%3DSUPERSECRET
+invalid	keymesh://v1/p/t/k/resource/https%3A%2F%2Faccount.blob.core.windows.net%2Fc%2Fb%3Fsv%3D2026%26sig%3DSUPERSECRET
+invalid	keymesh://v1/p/t/k/resource/foo%250Abar
+invalid	keymesh://v1/p/t/k/resource/foo%25C3%25A9
+invalid	keymesh://v1/p/t/k/resource/pkcs11%3Atoken%3D%250A%3Bobject%3Dmy-key%3Bid%3D%2501
+invalid	keymesh://v1/p/t/k/resource/pkcs11%3Atoken%3DHSM1%3Bobject%3Dmy-key%3Bid%3D%2501%3Bobject%3D%250A
