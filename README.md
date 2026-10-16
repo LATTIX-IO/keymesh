@@ -8,10 +8,9 @@ Project website: https://lattix.io
 
 ## Status
 
-This project is in early development.
-
-Public APIs should be considered unstable until the relevant crates reach
-their first stable release.
+**Unreleased bootstrap.** No provider-neutral key-management API or provider adapter
+is implemented yet. Public APIs will remain unstable until a deliberately approved
+release. The `keymesh` crate is explicitly **not publishable** at this stage.
 
 ## Crates
 
@@ -22,23 +21,43 @@ their first stable release.
 Run:
 
     cargo fmt --all -- --check
-    cargo check --workspace --all-targets --all-features
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
-    cargo test --workspace --all-features
+    cargo check --workspace --all-targets --all-features --locked
+    cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+    cargo test --workspace --all-features --locked
+    RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked
 
-## Publishing
+Publication guard checks (Python 3.11+; standard library only):
 
-All crates are bootstrapped with publish = false.
+    python3 scripts/check_release_safety.py
+    python3 -m unittest discover -s tests -p 'test_*.py' -v
+    cargo metadata --workspace --no-deps --locked --format-version 1
 
-Before enabling publication for a crate:
+`Rust CI` runs publication-policy checks, positive and negative regression
+fixtures, and the Rust/security gates on every pull request to `main` and on
+pushes to `main`.
 
-1. Re-check the exact package name on crates.io.
-2. Complete the public API and crate documentation.
-3. Add tests for supported behavior.
-4. Add crate-specific keywords/categories where appropriate.
-5. Review dependency licenses and security posture.
-6. Remove publish = false only for that crate.
-7. Publish deliberately.
+## Publishing: blocked during bootstrap
+
+Every workspace package must declare `publish = false`. In particular,
+`crates/keymesh/Cargo.toml` is **not** registered for crates.io publication.
+The prior `release-plz` action on pushes to `main` is disabled, registry/release
+tokens are no longer referenced by release workflows, and release-plz GitHub
+tag/release generation is disabled. An intentional `workflow_dispatch` run of
+**Release readiness (non-publishing)** can execute a read-only workspace
+metadata, compilation, and test preview. It cannot publish or create tags.
+
+To authorize a future release, submit a **separate release PR** that:
+
+1. Completes the public API, crate documentation, security and conformance tests.
+2. Rechecks the exact package name and crates.io ownership, licenses, and dependency advisories.
+3. Documents the release version, MSRV, changelog, feature/support matrix, and artifact provenance.
+4. Establishes protected, explicitly approved publication credentials and release workflow; no ordinary push to `main` or Dependabot PR should publish.
+5. Deliberately replaces/updates the bootstrap publication guard and changes `publish = false` only after reviewer approval and validation, then performs an independently checked packaging and installation test before registry publication.
+
+The static guard detects publication enabled in Cargo manifests, known direct
+publication actions, and unsafe workflow configuration. It does not establish
+that arbitrary scripts or third-party actions are safe. Protected branches,
+reviewed workflow changes, and least-privilege credentials remain necessary.
 
 ## License
 
