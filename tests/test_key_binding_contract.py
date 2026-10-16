@@ -40,11 +40,28 @@ def contract_decision(request: dict, bound: dict) -> str:
         return "deny"
     required_binding = request.get("required_binding")
     actual_binding = bound.get("assurance")
-    if required_binding not in BINDING_STRENGTH or actual_binding not in BINDING_STRENGTH:
+    if required_binding not in {"stable_resource", "provider_version", "material_version"} or actual_binding not in BINDING_STRENGTH:
         return "deny"
     if BINDING_STRENGTH[actual_binding] < BINDING_STRENGTH[required_binding]:
         return "deny"
     if actual_binding in {"alias_only", "unknown"}:
+        return "deny"
+    if actual_binding == "provider_version" and (
+        not bound.get("version") or bound.get("dispatch_kind") not in {"provider_version", "material_version"}
+    ):
+        return "deny"
+    if actual_binding == "material_version" and (
+        not bound.get("version") or not bound.get("material_revision")
+        or not bound.get("material_revision_selectable")
+        or bound.get("dispatch_kind") != "material_version"
+    ):
+        return "deny"
+    if request.get("required_version") is not None and bound.get("version") != request["required_version"]:
+        return "deny"
+    if request.get("required_material_revision") is not None and (
+        bound.get("material_revision") != request["required_material_revision"]
+        or not bound.get("material_revision_selectable")
+    ):
         return "deny"
     if required_binding == "provider_version" or required_binding == "material_version":
         if not request.get("required_version") or bound.get("version") != request["required_version"]:
@@ -95,6 +112,16 @@ class ContractFixtureTests(unittest.TestCase):
                 request = {**baseline_request, **case.get("request", {})}
                 bound = {**baseline_bound, **case.get("bound", {})}
                 self.assertEqual(contract_decision(request, bound), case["expected"])
+
+    def test_unknown_requested_binding_fails_closed(self) -> None:
+        request = {**self.data["defaults"]["request"], "required_binding": "unknown"}
+        bound = self.data["defaults"]["bound"]
+        self.assertEqual(contract_decision(request, bound), "deny")
+
+    def test_explicit_version_request_cannot_be_ignored(self) -> None:
+        request = {**self.data["defaults"]["request"], "required_version": "v2"}
+        bound = {**self.data["defaults"]["bound"], "version": "v3"}
+        self.assertEqual(contract_decision(request, bound), "deny")
 
     def test_mutation_property_wrong_provider_or_namespace_denies(self) -> None:
         request = self.data["defaults"]["request"]
