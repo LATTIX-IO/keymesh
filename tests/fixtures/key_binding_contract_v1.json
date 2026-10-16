@@ -11,7 +11,6 @@
       "required_version": null,
       "required_material_revision": null,
       "require_attested_hsm": false,
-      "host_scope_verified": true,
       "operation": "Encrypt",
       "profile": "AES-256-GCM",
       "payload_kind": "plaintext",
@@ -36,7 +35,8 @@
       "profile": "AES-256-GCM",
       "payload_kind": "plaintext",
       "policy_decision": "allow",
-      "mutation_approved": false
+      "mutation_approved": false,
+      "host_scope_verified": true
     }
   },
   "cases": [
@@ -314,7 +314,7 @@
       "threat_id": "TM-08",
       "reason": "Claimed audit labels cannot satisfy authenticated tenant scope",
       "expected": "deny",
-      "request": {
+      "bound": {
         "host_scope_verified": false
       }
     },
