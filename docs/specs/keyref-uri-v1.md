@@ -28,6 +28,15 @@ encoded as `%HH` (uppercase hex), including `:` → `%3A`, `/` → `%2F` and
 `%` → `%25`. Redundant escapes and lowercase hex are noncanonical.
 The complete URI is bounded at 4096 bytes.
 
+Native locator checks forbid cloud presigned signatures (AWS X-Amz-Signature,
+Azure SAS sig, and other secret-bearing fields) and reject nested percent
+encoding before an adapter receives the reference. After the native locator's
+single decode, control bytes, non-ASCII bytes and backslashes are rejected.
+The sole narrow exception is percent-encoded binary octets within a terminal
+PKCS#11 `id=` attribute, as required by RFC 7512; earlier PKCS#11 fields
+cannot contain encoded controls. A credential must never be placed in any
+provider-native resource, including one with misleading escaping.
+
 **Unicode policy:** v1 intentionally accepts only ASCII identities and
 decoded resource values. No Unicode normalization or case folding occurs.
 Unicode/UTF-8 percent encodings are rejected, not silently converted into
