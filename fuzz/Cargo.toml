@@ -1,0 +1,22 @@
+[package]
+name = "keymesh-uri-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+keymesh = { path = "../crates/keymesh" }
+
+[[bin]]
+name = "keyref_uri"
+path = "fuzz_targets/keyref_uri.rs"
+test = false
+doc = false
+bench = false
+
+# The opt-in fuzzing harness is deliberately outside the release workspace.
+[workspace]
