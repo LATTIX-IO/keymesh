@@ -8,8 +8,8 @@ Project website: https://lattix.io
 
 ## Status
 
-**Unreleased bootstrap.** No provider-neutral key-management API or provider adapter
-is implemented yet. Public APIs will remain unstable until a deliberately approved
+**Unreleased bootstrap.** The typed identity and URI contract APIs exist, but
+no cryptographic provider operation interface or backend is implemented yet. Public APIs will remain unstable until a deliberately approved
 release. The `keymesh` crate is explicitly **not publishable** at this stage.
 
 ## Security and key-versioning design (KM-01)
