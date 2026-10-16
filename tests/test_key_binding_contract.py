@@ -25,7 +25,7 @@ SENSITIVE_MARKERS = ("pin-value=", "pin-source=", "access_token=", "bearer_token
 
 def contract_decision(request: dict, bound: dict) -> str:
     """Minimal design oracle to test the future API's fail-closed obligations."""
-    if not request.get("host_scope_verified"):
+    if not bound.get("host_scope_verified"):
         return "deny"
     if not bound.get("authorization_verified"):
         return "deny"
@@ -112,6 +112,12 @@ class ContractFixtureTests(unittest.TestCase):
                 request = {**baseline_request, **case.get("request", {})}
                 bound = {**baseline_bound, **case.get("bound", {})}
                 self.assertEqual(contract_decision(request, bound), case["expected"])
+
+    def test_client_claim_does_not_override_host_scope(self) -> None:
+        """The host-verified scope belongs to the trusted bound context."""
+        request = {**self.data["defaults"]["request"], "host_scope_verified": True}
+        bound = {**self.data["defaults"]["bound"], "host_scope_verified": False}
+        self.assertEqual(contract_decision(request, bound), "deny")
 
     def test_unknown_requested_binding_fails_closed(self) -> None:
         request = {**self.data["defaults"]["request"], "required_binding": "unknown"}
