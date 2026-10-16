@@ -5,7 +5,8 @@ use keymesh::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let textual = "keymesh://v1/software-local/tenant-a/customer-data/resource/software%3Acustomer-data%3A42";
+    let textual =
+        "keymesh://v1/software-local/tenant-a/customer-data/resource/software%3Acustomer-data%3A42";
     let reference: KeyRef = textual.parse()?;
     assert_eq!(reference.to_string(), textual);
 
@@ -28,6 +29,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         RequiredAssurance::StableResource,
     )?;
     println!("canonical KeyRef: {textual}");
-    println!("validated pre-dispatch target: {}", target.dispatch_target().resource());
+    println!(
+        "validated pre-dispatch target: {}",
+        target.dispatch_target().resource()
+    );
     Ok(())
 }
