@@ -1,0 +1,403 @@
+{
+  "schema": "keymesh.key-binding-contract/v1",
+  "note": "Reference-model fixtures only; not proof of Rust/provider enforcement",
+  "defaults": {
+    "request": {
+      "provider_instance": "software-local",
+      "namespace": "tenant-a",
+      "logical_key": "customer-data",
+      "resource_id": "software:customer-data:42",
+      "required_binding": "stable_resource",
+      "required_version": null,
+      "required_material_revision": null,
+      "require_attested_hsm": false,
+      "host_scope_verified": true,
+      "operation": "Encrypt",
+      "profile": "AES-256-GCM",
+      "payload_kind": "plaintext",
+      "mandatory_policy": false,
+      "mutation": false
+    },
+    "bound": {
+      "provider_instance": "software-local",
+      "namespace": "tenant-a",
+      "logical_key": "customer-data",
+      "resource_id": "software:customer-data:42",
+      "dispatch_kind": "stable_resource",
+      "provider_locator": "software:customer-data:42",
+      "assurance": "stable_resource",
+      "version": null,
+      "material_revision": null,
+      "material_revision_selectable": false,
+      "protection": "software",
+      "protection_verified": false,
+      "authorization_verified": true,
+      "operation": "Encrypt",
+      "profile": "AES-256-GCM",
+      "payload_kind": "plaintext",
+      "policy_decision": "allow",
+      "mutation_approved": false
+    }
+  },
+  "cases": [
+    {
+      "id": "software-stable",
+      "threat_id": "TM-04",
+      "reason": "Explicit software resource dispatch meets stable-resource requirement",
+      "expected": "allow"
+    },
+    {
+      "id": "azure-exact-version",
+      "threat_id": "TM-04",
+      "reason": "Versioned Azure key URI bound for a supported operation",
+      "expected": "allow",
+      "request": {
+        "provider_instance": "azure-prod",
+        "resource_id": "https://vault.vault.azure.net/keys/payments/key-v7",
+        "required_binding": "provider_version",
+        "required_version": "key-v7"
+      },
+      "bound": {
+        "provider_instance": "azure-prod",
+        "resource_id": "https://vault.vault.azure.net/keys/payments/key-v7",
+        "dispatch_kind": "provider_version",
+        "assurance": "provider_version",
+        "version": "key-v7"
+      }
+    },
+    {
+      "id": "vault-exact-version",
+      "threat_id": "TM-04",
+      "reason": "Vault Transit signed/encrypted operation binds explicitly selected version",
+      "expected": "allow",
+      "request": {
+        "provider_instance": "vault-prod",
+        "resource_id": "transit:payments",
+        "required_binding": "provider_version",
+        "required_version": "5"
+      },
+      "bound": {
+        "provider_instance": "vault-prod",
+        "resource_id": "transit:payments",
+        "dispatch_kind": "provider_version",
+        "assurance": "provider_version",
+        "version": "5"
+      }
+    },
+    {
+      "id": "aws-stable-resource",
+      "threat_id": "TM-03",
+      "reason": "Stable KMS ARN can satisfy resource-bound requirement despite managed rotation",
+      "expected": "allow",
+      "request": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd"
+      },
+      "bound": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
+        "assurance": "stable_resource"
+      }
+    },
+    {
+      "id": "aws-no-exact-material",
+      "threat_id": "TM-03",
+      "reason": "Stable KeyId does not select underlying material revision",
+      "expected": "deny",
+      "request": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
+        "required_binding": "material_version",
+        "required_version": "rotation-7",
+        "required_material_revision": "rotation-7"
+      },
+      "bound": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
+        "assurance": "stable_resource",
+        "material_revision": "rotation-7"
+      }
+    },
+    {
+      "id": "aws-material-metadata-only",
+      "threat_id": "TM-03",
+      "reason": "ListKeyRotations material ID observation does not prove operation selectability",
+      "expected": "deny",
+      "request": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
+        "required_binding": "material_version",
+        "required_version": "rotation-7",
+        "required_material_revision": "rotation-7"
+      },
+      "bound": {
+        "provider_instance": "aws-prod",
+        "resource_id": "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
+        "assurance": "material_version",
+        "dispatch_kind": "material_version",
+        "version": "rotation-7",
+        "material_revision": "rotation-7",
+        "material_revision_selectable": false
+      }
+    },
+    {
+      "id": "software-exact-material",
+      "threat_id": "TM-03",
+      "reason": "Immutable local entry bound to exact version and material revision",
+      "expected": "allow",
+      "request": {
+        "required_binding": "material_version",
+        "required_version": "v3",
+        "required_material_revision": "rev3"
+      },
+      "bound": {
+        "assurance": "material_version",
+        "dispatch_kind": "material_version",
+        "version": "v3",
+        "material_revision": "rev3",
+        "material_revision_selectable": true
+      }
+    },
+    {
+      "id": "alias-swapped",
+      "threat_id": "TM-01",
+      "reason": "Alias re-submitted at dispatch can resolve to a different key",
+      "expected": "deny",
+      "bound": {
+        "assurance": "alias_only",
+        "dispatch_kind": "alias"
+      }
+    },
+    {
+      "id": "alias-active-resolved",
+      "threat_id": "TM-01",
+      "reason": "Alias was resolved before dispatch and pinned to stable immutable resource reference",
+      "expected": "allow"
+    },
+    {
+      "id": "wrong-provider",
+      "threat_id": "TM-02",
+      "reason": "Result instance must equal host-selected provider",
+      "expected": "deny",
+      "bound": {
+        "provider_instance": "software-other"
+      }
+    },
+    {
+      "id": "wrong-namespace",
+      "threat_id": "TM-02",
+      "reason": "Result namespace must equal authoritative tenant scope",
+      "expected": "deny",
+      "bound": {
+        "namespace": "tenant-b"
+      }
+    },
+    {
+      "id": "wrong-resource",
+      "threat_id": "TM-02",
+      "reason": "Stable native resource must match the resolved identity",
+      "expected": "deny",
+      "bound": {
+        "resource_id": "software:customer-data:99"
+      }
+    },
+    {
+      "id": "wrong-logical-key",
+      "threat_id": "TM-02",
+      "reason": "Logical key mismatch must be rejected",
+      "expected": "deny",
+      "bound": {
+        "logical_key": "system-master"
+      }
+    },
+    {
+      "id": "stale-azure-version",
+      "threat_id": "TM-04",
+      "reason": "Version differs from exact requested provider version",
+      "expected": "deny",
+      "request": {
+        "provider_instance": "azure-prod",
+        "resource_id": "https://vault.vault.azure.net/keys/payments/key-v7",
+        "required_binding": "provider_version",
+        "required_version": "key-v7"
+      },
+      "bound": {
+        "provider_instance": "azure-prod",
+        "resource_id": "https://vault.vault.azure.net/keys/payments/key-v7",
+        "assurance": "provider_version",
+        "dispatch_kind": "provider_version",
+        "version": "key-v6"
+      }
+    },
+    {
+      "id": "software-stale-material",
+      "threat_id": "TM-04",
+      "reason": "Exact material revision from an earlier software key cannot satisfy newly required revision",
+      "expected": "deny",
+      "request": {
+        "required_binding": "material_version",
+        "required_version": "v3",
+        "required_material_revision": "rev3"
+      },
+      "bound": {
+        "assurance": "material_version",
+        "dispatch_kind": "material_version",
+        "version": "v3",
+        "material_revision": "rev2",
+        "material_revision_selectable": true
+      }
+    },
+    {
+      "id": "unknown-assurance",
+      "threat_id": "TM-03",
+      "reason": "Missing/unknown version guarantees cannot satisfy stable resource",
+      "expected": "deny",
+      "bound": {
+        "assurance": "unknown"
+      }
+    },
+    {
+      "id": "hsm-missing",
+      "threat_id": "TM-05",
+      "reason": "HSM requirement cannot silently fall back to software",
+      "expected": "deny",
+      "request": {
+        "require_attested_hsm": true
+      }
+    },
+    {
+      "id": "hsm-unverified",
+      "threat_id": "TM-12",
+      "reason": "Provider-reported HSM class without verified attestation cannot satisfy verified requirement",
+      "expected": "deny",
+      "request": {
+        "require_attested_hsm": true
+      },
+      "bound": {
+        "protection": "hsm",
+        "protection_verified": false
+      }
+    },
+    {
+      "id": "hsm-verified",
+      "threat_id": "TM-12",
+      "reason": "Verified HSM protection can meet the explicit requirement",
+      "expected": "allow",
+      "request": {
+        "require_attested_hsm": true
+      },
+      "bound": {
+        "protection": "hsm",
+        "protection_verified": true
+      }
+    },
+    {
+      "id": "uri-secret",
+      "threat_id": "TM-06",
+      "reason": "Public KeyRef/URI may not embed credential material",
+      "expected": "deny",
+      "bound": {
+        "provider_locator": "pkcs11:object=mykey?pin-value=1234"
+      }
+    },
+    {
+      "id": "unauthorized",
+      "threat_id": "TM-08",
+      "reason": "Host/adapter authorization must be verified",
+      "expected": "deny",
+      "bound": {
+        "authorization_verified": false
+      }
+    },
+    {
+      "id": "untrusted-host-scope",
+      "threat_id": "TM-08",
+      "reason": "Claimed audit labels cannot satisfy authenticated tenant scope",
+      "expected": "deny",
+      "request": {
+        "host_scope_verified": false
+      }
+    },
+    {
+      "id": "sign-input-mismatch",
+      "threat_id": "TM-09",
+      "reason": "Digest input cannot be silently sent through a message-signing profile",
+      "expected": "deny",
+      "request": {
+        "operation": "SignDigest",
+        "profile": "RSA-PSS-SHA256",
+        "payload_kind": "digest-sha256"
+      },
+      "bound": {
+        "operation": "SignMessage",
+        "profile": "RSA-PSS-SHA256",
+        "payload_kind": "raw-message"
+      }
+    },
+    {
+      "id": "wrap-as-encrypt",
+      "threat_id": "TM-10",
+      "reason": "WrapKey requires distinct capability rather than Encrypt",
+      "expected": "deny",
+      "request": {
+        "operation": "WrapKey",
+        "profile": "AES-KW",
+        "payload_kind": "key-material"
+      },
+      "bound": {
+        "operation": "Encrypt",
+        "profile": "AES-KW",
+        "payload_kind": "key-material"
+      }
+    },
+    {
+      "id": "native-handle-dispatch",
+      "threat_id": "TM-11",
+      "reason": "Ephemeral CK_OBJECT_HANDLE cannot serve as durable dispatch ref",
+      "expected": "deny",
+      "bound": {
+        "dispatch_kind": "ephemeral_handle"
+      }
+    },
+    {
+      "id": "policy-timeout",
+      "threat_id": "TM-14",
+      "reason": "Required policy hook timeout must prevent provider dispatch",
+      "expected": "deny",
+      "request": {
+        "mandatory_policy": true
+      },
+      "bound": {
+        "policy_decision": "indeterminate"
+      }
+    },
+    {
+      "id": "mutation-unapproved",
+      "threat_id": "TM-07",
+      "reason": "Remote mutation requires explicit host approval",
+      "expected": "deny",
+      "request": {
+        "mutation": true,
+        "operation": "Rotate"
+      },
+      "bound": {
+        "operation": "Rotate",
+        "mutation_approved": false
+      }
+    },
+    {
+      "id": "mutation-approved",
+      "threat_id": "TM-07",
+      "reason": "Explicitly approved mutation may dispatch if all other constraints match",
+      "expected": "allow",
+      "request": {
+        "mutation": true,
+        "operation": "Rotate"
+      },
+      "bound": {
+        "operation": "Rotate",
+        "mutation_approved": true
+      }
+    }
+  ]
+}
