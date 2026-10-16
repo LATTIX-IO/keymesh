@@ -106,6 +106,45 @@ class PublicationGuardTests(unittest.TestCase):
                    RELEASE.replace("contents: read", "contents: write"))
         self.rejected()
 
+    def test_job_level_write_all_rejected(self) -> None:
+        self.write(".github/workflows/release-plz.yml", RELEASE.replace(
+            "  preview:\n", "  preview:\n    permissions: write-all\n"))
+        self.rejected()
+
+    def test_other_permission_write_rejected(self) -> None:
+        self.write(".github/workflows/release-plz.yml", RELEASE.replace(
+            "  contents: read\n", "  contents: read\n  actions: write\n"))
+        self.rejected()
+
+    def test_inline_permission_write_rejected(self) -> None:
+        self.write(".github/workflows/release-plz.yml", RELEASE.replace(
+            "  preview:\n", "  preview:\n    permissions: {deployments: write}\n"))
+        self.rejected()
+
+    def test_release_guard_echo_not_executed_rejected(self) -> None:
+        self.write(".github/workflows/release-plz.yml", RELEASE.replace(
+            "run: python3 scripts/check_release_safety.py",
+            'run: echo "python3 scripts/check_release_safety.py"'))
+        self.rejected()
+
+    def test_ci_guard_echo_not_executed_rejected(self) -> None:
+        self.write(".github/workflows/ci.yml", CI.replace(
+            "run: python3 scripts/check_release_safety.py",
+            'run: echo "python3 scripts/check_release_safety.py"'))
+        self.rejected()
+
+    def test_ci_guard_yaml_comment_not_executed_rejected(self) -> None:
+        self.write(".github/workflows/ci.yml", CI.replace(
+            "- run: python3 scripts/check_release_safety.py",
+            "# run: python3 scripts/check_release_safety.py"))
+        self.rejected()
+
+    def test_ci_unittest_echo_not_executed_rejected(self) -> None:
+        self.write(".github/workflows/ci.yml", CI.replace(
+            "run: python3 -m unittest discover -s tests",
+            'run: echo "python3 -m unittest discover -s tests"'))
+        self.rejected()
+
     def test_automatic_tagging_rejected(self) -> None:
         self.write("release-plz.toml", CONFIG.replace("git_tag_enable = false", "git_tag_enable = true"))
         self.rejected()
