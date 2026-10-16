@@ -29,6 +29,31 @@ classification. These are **reference-model tests**, not deployed Rust/provider
 enforcement or an HSM/KMS certification. Implementations in subsequent
 increments must replay equivalent fixtures at their real operation boundary.
 
+## KM-02: provider identities and version assurance (implementation preview)
+
+The `keymesh` Rust crate now contains a **pre-dispatch** binding contract. The following example validates a scope-qualified resource identity without performing a cryptographic operation:
+
+```console
+cargo run --example preflight
+cargo test --workspace --all-features
+python3 scripts/generate_km02_contract.py --check
+```
+
+Public APIs:
+
+- `ProviderInstanceId`, `ProviderNamespace`, `LogicalKeyId`, `ProviderResourceId`, `ProviderVersionId` (`KeyVersionId`), `MaterialRevisionId`: distinct, bounded identifier types; strict ASCII labels; native locator validation rejects obvious secret-bearing fields and malformed encodings. URI canonicalization is **not** implemented yet (KM-03).
+- `KeyRef` + `KeySelector`: logical reference distinct from `Active`, `Latest`, stable-resource, exact provider-version, and exact material-revision selectors.
+- `DispatchTarget`: only concrete resource/version/material-revision targets; no mutable alias or native session-handle variant.
+- `HostScope` and `preflight_bind`: compare host-authorized scope, requested logical key/resource, required assurance and concrete provider resolution; reject unsupported exact-version constraints instead of falling back.
+- `ResolvedKey::with_observed_material_revision` explicitly records informational key-material revisions without claiming they are selectable. For example, AWS KMS material-rotation history does not satisfy `RequiredAssurance::MaterialVersion`.
+
+### Scope and trust boundary
+
+`HostScope::new` does **not** authenticate a caller or create IAM credentials. A host application must create it only after validating identity and provider tenancy. `ResolvedKey` is a **provider-supplied proposal**, not an HSM attestation; future adapters must verify actual provider capability, resolve mutable aliases to immutable dispatch handles, and pass the exact validated `DispatchTarget` into cryptographic execution. No provider implementations, IAM, key generation, or network calls exist in this increment.
+
+Rust regression tests cover negative collisions, cross-provider/tenant substitution, material-version downgrades, stale Azure/Vault key versions, bounded inputs, secret-bearing PKCS#11 locators, and a standalone example. `scripts/generate_km02_contract.py` projects **14 identity-specific cases** from the KM-01 JSON fixtures into a generated `.inc` expression consumed directly by the Rust integration test. CI verifies this projection has not drifted; operation, policy, authentication and destructive-mutation cases remain owned by later increments.
+
+Because these preflight checks require an adapter to honor the bound target, passing these tests is not proof that any remote cryptographic operation is secure.
 ## Crates
 
 - keymesh
