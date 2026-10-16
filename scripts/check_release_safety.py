@@ -21,6 +21,18 @@ def check_manifest(path: Path) -> bool:
     return True
 
 
+def has_run_step(workflow: str, command_pattern: str) -> bool:
+    """Require an executable YAML run field, not an echo or commented string.
+
+    Restrict to the single-line run form used in our controlled workflows.
+    This lightweight policy is not a general YAML security parser.
+    """
+    return re.search(
+        rf"(?m)^[ \t]*(?:-[ \t]*)?run:[ \t]*{command_pattern}[ \t]*(?:#.*)?$",
+        workflow,
+    ) is not None
+
+
 def check_release_workflow(text: str) -> None:
     lines = text.splitlines()
     on_lines = [i for i, line in enumerate(lines) if line.rstrip() == "on:"]
@@ -38,10 +50,12 @@ def check_release_workflow(text: str) -> None:
         r"(?m)^  contents:\s*read\s*$", text
     ):
         raise ReleaseSafetyError("Release workflow requires contents: read permission")
-    if re.search(r"(?im)^\s*(?:contents|pull-requests|packages|id-token):\s*write\b", text):
+    # Workflow-level and job-level write permissions are forbidden, including
+    # GitHub Actions "write-all" and inline permission maps.
+    if re.search(r"(?im)\bwrite-all\b|\b[\w-]+\s*:\s*['\"]?write\b", text):
         raise ReleaseSafetyError("Release preview may not request write permissions")
-    if "python3 scripts/check_release_safety.py" not in text:
-        raise ReleaseSafetyError("Release workflow must invoke the publication guard")
+    if not has_run_step(text, r"python3 scripts/check_release_safety\.py"):
+        raise ReleaseSafetyError("Release workflow must execute the publication guard")
 
 
 def check_repository(root: Path) -> int:
@@ -75,9 +89,10 @@ def check_repository(root: Path) -> int:
                 raise ReleaseSafetyError(f"{path}: forbidden {label}")
     check_release_workflow(release_path.read_text(encoding="utf-8"))
     ci = ci_path.read_text(encoding="utf-8")
-    if ("python3 scripts/check_release_safety.py" not in ci
-            or "python3 -m unittest discover -s tests" not in ci):
-        raise ReleaseSafetyError("PR CI must run guard and adversarial tests")
+    if not has_run_step(ci, r"python3 scripts/check_release_safety\.py") or not has_run_step(
+        ci, r"python3 -m unittest discover -s tests(?:[ \t]+[^\n#]+)?"
+    ):
+        raise ReleaseSafetyError("PR CI must execute guard and adversarial tests")
     config_path = root / "release-plz.toml"
     if config_path.is_file():
         config = tomllib.loads(config_path.read_text(encoding="utf-8")).get("workspace", {})
