@@ -64,7 +64,7 @@ jobs:
         run: cargo test --workspace --all-features --locked
 
       - name: Execute KeyRef URI consumer example
-        run: cargo run --locked --example keyref_uri
+        run: cargo run --locked -p keymesh --example keyref_uri
 
       - name: Documentation
         env:
@@ -108,4 +108,4 @@ jobs:
         run: cargo test --workspace --all-features --locked
 
       - name: Execute KeyRef URI consumer example at MSRV
-        run: cargo run --locked --example keyref_uri
+        run: cargo run --locked -p keymesh --example keyref_uri
