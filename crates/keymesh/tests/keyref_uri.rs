@@ -38,12 +38,15 @@ fn versioned_uri_golden_fixtures_are_exact_and_fail_closed() {
         match kind {
             "valid" => {
                 accepted += 1;
-                let parsed: KeyRef = text.parse().unwrap_or_else(|e| {
-                    panic!("valid fixture unexpectedly rejected: {text}: {e}")
-                });
+                let parsed: KeyRef = text
+                    .parse()
+                    .unwrap_or_else(|e| panic!("valid fixture unexpectedly rejected: {text}: {e}"));
                 assert_eq!(parsed.to_string(), text, "not canonical: {text}");
                 assert_eq!(
-                    parsed.to_string().parse::<KeyRef>().unwrap_or_else(|_| unreachable!()),
+                    parsed
+                        .to_string()
+                        .parse::<KeyRef>()
+                        .unwrap_or_else(|_| unreachable!()),
                     parsed
                 );
             }
@@ -82,12 +85,7 @@ fn construction_and_parse_roundtrip_for_all_selector_variants() {
         },
     ];
     for selector in selectors {
-        let wanted = KeyRef::new(
-            instance.clone(),
-            namespace.clone(),
-            key.clone(),
-            selector,
-        );
+        let wanted = KeyRef::new(instance.clone(), namespace.clone(), key.clone(), selector);
         let rendered = wanted.to_string();
         let parsed: KeyRef = rendered.parse().unwrap_or_else(|_| unreachable!());
         assert_eq!(wanted, parsed);
@@ -129,9 +127,7 @@ fn uri_cannot_upgrade_opaque_material_rotation_to_exact_material() {
         provider_id.clone(),
         tenant.clone(),
         logical("payments"),
-        DispatchTarget::StableResource(resource(
-            "arn:aws:kms:us-east-1:111122223333:key/1234abcd",
-        )),
+        DispatchTarget::StableResource(resource("arn:aws:kms:us-east-1:111122223333:key/1234abcd")),
     )
     .with_observed_material_revision(revision("rev4"));
     assert_eq!(
@@ -173,7 +169,10 @@ fn invalid_uris_never_echo_secrets_into_errors() {
 
 #[test]
 fn byte_length_limit_is_enforced_before_parsing() {
-    let oversized = format!("keymesh://v1/p/t/k/resource/{}", "x".repeat(MAX_KEY_REF_URI_BYTES));
+    let oversized = format!(
+        "keymesh://v1/p/t/k/resource/{}",
+        "x".repeat(MAX_KEY_REF_URI_BYTES)
+    );
     assert_eq!(oversized.parse::<KeyRef>(), Err(KeyRefUriError::TooLong));
     assert_eq!(
         ProviderResourceId::parse("../cross-tenant"),
@@ -195,15 +194,15 @@ fn deterministic_roundtrips_and_adversarial_mutations() {
             seed = seed
                 .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
-            namespace.push(char::from(alphabet[((seed >> 32) as usize) % alphabet.len()]));
+            namespace.push(char::from(
+                alphabet[((seed >> 32) as usize) % alphabet.len()],
+            ));
         }
         let reference = KeyRef::new(
             provider("sw"),
             scope(&namespace),
             logical("project-key"),
-            KeySelector::StableResource(resource(&format!(
-                "urn:untrusted:source/{i}:%2Fslash"
-            ))),
+            KeySelector::StableResource(resource(&format!("urn:untrusted:source/{i}:%2Fslash"))),
         );
         let text = reference.to_string();
         let parsed: KeyRef = text.parse().unwrap_or_else(|_| unreachable!());
@@ -222,22 +221,28 @@ fn deterministic_roundtrips_and_adversarial_mutations() {
 #[test]
 fn malformed_unicode_percent_sequences_and_delimiters_cannot_panic() {
     let alphabet = [
-        'a', 'B', '0', '/', '%', ':', '?', '#', '@', '\\', '.', 'é', 'λ',
-        '\0', '-', '+',
+        'a', 'B', '0', '/', '%', ':', '?', '#', '@', '\\', '.', 'é', 'λ', '\0', '-', '+',
     ];
     let mut state = 0xA81B4DE25127AA45u64;
     for _ in 0..2000 {
-        state = state.wrapping_mul(2862933555777941757).wrapping_add(3037000493);
+        state = state
+            .wrapping_mul(2862933555777941757)
+            .wrapping_add(3037000493);
         let len = ((state >> 32) % 80) as usize;
         let mut value = String::from("keymesh://v1/");
         for _ in 0..len {
-            state = state.wrapping_mul(2862933555777941757).wrapping_add(3037000493);
+            state = state
+                .wrapping_mul(2862933555777941757)
+                .wrapping_add(3037000493);
             value.push(alphabet[((state >> 32) as usize) % alphabet.len()]);
         }
         if let Ok(parsed) = value.parse::<KeyRef>() {
             assert_eq!(parsed.to_string(), value);
             assert_eq!(
-                parsed.to_string().parse::<KeyRef>().unwrap_or_else(|_| unreachable!()),
+                parsed
+                    .to_string()
+                    .parse::<KeyRef>()
+                    .unwrap_or_else(|_| unreachable!()),
                 parsed
             );
         }
