@@ -111,9 +111,9 @@ fn suspicious_locator_field(bytes: &[u8]) -> bool {
 // Opaque provider locators may contain literal or encoded slashes, but dot
 // segments must never be accepted as stable resource identifiers.
 fn has_dot_segments(bytes: &[u8]) -> bool {
-    bytes.split(|b| *b == b'/').any(|segment| {
-        segment == b"." || segment == b".."
-    })
+    bytes
+        .split(|b| *b == b'/')
+        .any(|segment| segment == b"." || segment == b"..")
 }
 
 fn validate_resource(value: &str) -> Result<(), IdentityError> {
