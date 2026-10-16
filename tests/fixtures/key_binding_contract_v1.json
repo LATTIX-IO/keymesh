@@ -398,6 +398,15 @@
         "operation": "Rotate",
         "mutation_approved": true
       }
+    },
+    {
+      "id": "pkcs11-token-label",
+      "threat_id": "TM-11",
+      "reason": "RFC 7512 PKCS#11 token label is public selection metadata, not a bearer credential",
+      "expected": "allow",
+      "bound": {
+        "provider_locator": "pkcs11:token=HSM1;object=my-key;type=private;id=%01"
+      }
     }
   ]
 }
