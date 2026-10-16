@@ -159,8 +159,14 @@ fn validate_resource(value: &str) -> Result<(), IdentityError> {
             .map(|index| index + 4)
             .or_else(|| lowercase.starts_with("pkcs11:id=").then_some(10));
         marker
-            .filter(|start| !lowercase[*start..].contains(';') && !lowercase[*start..].contains('?'))
-            .and_then(|start| percent_decode(&value.as_bytes()[..start]).ok().map(|v| v.len()))
+            .filter(|start| {
+                !lowercase[*start..].contains(';') && !lowercase[*start..].contains('?')
+            })
+            .and_then(|start| {
+                percent_decode(&value.as_bytes()[..start])
+                    .ok()
+                    .map(|v| v.len())
+            })
     } else {
         None
     };
