@@ -368,3 +368,37 @@ fn isolated_thread_requests_do_not_cross_tenant_scope() {
             .unwrap_or_else(|_| panic!("credential worker panicked"));
     }
 }
+
+
+#[test]
+fn concurrent_unauthorized_tenant_cannot_access_shared_host_credential_source() {
+    let source = Arc::new(FakeSource::new());
+    let handles: Vec<_> = (0..24)
+        .map(|index| {
+            let shared_source = Arc::clone(&source);
+            std::thread::spawn(move || {
+                let mut fixture = Fixture::new();
+                if index % 2 != 0 {
+                    fixture.tenant = namespace("tenant-b");
+                    fixture.scope = HostScope::new(instance("mock-hsm"), namespace("tenant-b"));
+                }
+                let result = drive(acquire_scoped_credential(
+                    shared_source.as_ref(), &fixture.gate, fixture.request(),
+                ));
+                if index % 2 == 0 {
+                    let mut owned = result.unwrap_or_else(|e| panic!("{e}"));
+                    assert_eq!(owned.scope(), &fixture.scope);
+                    owned.erase();
+                    assert!(owned.is_empty());
+                } else {
+                    assert!(matches!(result, Err(CredentialError::ScopeMismatch)));
+                    assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 0);
+                }
+            })
+        })
+        .collect();
+    for handle in handles {
+        handle.join().unwrap_or_else(|_| panic!("credential worker panicked"));
+    }
+    assert_eq!(source.calls.load(Ordering::SeqCst), 12);
+}
