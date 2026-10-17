@@ -27,8 +27,9 @@ use zeroize::Zeroizing;
 
 mod lifecycle;
 pub use lifecycle::{
-    SoftwareLogicalSnapshot, SoftwareLifecycleEvidence, SoftwareRotateRequest,
-    SoftwareTransitionAction, SoftwareTransitionRequest, SoftwareVersionSnapshot,
+    MAX_SOFTWARE_VERSIONS_PER_KEY, SoftwareLifecycleEvidence, SoftwareLogicalSnapshot,
+    SoftwareRotateRequest, SoftwareRotation, SoftwareTransitionAction,
+    SoftwareTransitionRequest, SoftwareVersionSnapshot,
 };
 
 /// Hard cap on one pure-Ed25519 message accepted by software dispatch.
