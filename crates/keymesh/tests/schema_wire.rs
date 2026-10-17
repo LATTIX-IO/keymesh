@@ -107,6 +107,10 @@ fn neither_unknown_extensions_nor_implicit_private_export_can_be_dispatched() {
         export: ExportRequirement::None,
     };
     let host = keymesh::HostValidatedCapabilities {
+        scope: Some(keymesh::HostScope::new(
+            keymesh::ProviderInstanceId::parse("mock-hsm").unwrap_or_else(|e| panic!("{e}")),
+            keymesh::ProviderNamespace::parse("tenant-a").unwrap_or_else(|e| panic!("{e}")),
+        )),
         version_model: Some(keymesh::VersionModel::ProviderVersion),
         ..Default::default()
     };
