@@ -28,7 +28,7 @@ provider routing:
    **prevents operation dispatch**. This library does not contain a policy
    evaluator or independently establish host identity.
 5. Construct a private-constructor `PreparedDispatch` that retains the exact
-   target, operation and provider feature revision. A provider adapter MUST
+   target, operation, and provider feature **and protocol** revisions. A provider adapter MUST
    use that target, not its mutable alias, and MUST recheck actual
    key-material/version selection at the native boundary.
 6. Invoke exactly one discrete provider trait method: sign, verify, encrypt,
@@ -36,7 +36,8 @@ provider routing:
    to Unsupported with no operation side effect; there is **no implicit
    software fallback**.
 7. Compare the provider-reported target with the preflight target and check
-   that the response kind matches the exact operation. Return operation-bound
+   that the response kind matches the exact operation, including exact
+   FIPS 203 ML-KEM encapsulation ciphertext size. Return operation-bound
    `OperationEvidence` only after a confirmed result. Invalid post-dispatch
    evidence is classified `UnknownCommitState`, not `NotDispatched`, because a
    side effect may already have occurred.
