@@ -2,7 +2,8 @@
 use keymesh::{
     AlgorithmProfile as A, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry,
     CapabilityError, CryptoOperation as O, DigestAlgorithm as D, ExportRequirement, Exportability,
-    HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, OperationIntent, PayloadDescriptor as P,
+    HostScope, HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, OperationIntent,
+    PayloadDescriptor as P, ProviderInstanceId, ProviderNamespace,
     ProfileError, ProtectionClass, ProtectionRequirement, ProviderCapabilities, SupportStatus,
     VersionModel, VersionRequirement,
 };
@@ -31,6 +32,8 @@ fn capability(
 fn catalog() -> ProviderCapabilities {
     ProviderCapabilities {
         schema_version: CAPABILITY_SCHEMA_VERSION,
+        provider_instance: "mock-hsm".into(),
+        namespace: "tenant-a".into(),
         protocol_revision: "vault.transit.v1".into(),
         feature_revision: "fixture.r1".into(),
         reported_protection: ProtectionClass::Hsm,
@@ -54,6 +57,10 @@ fn catalog() -> ProviderCapabilities {
 }
 fn host() -> HostValidatedCapabilities {
     HostValidatedCapabilities {
+        scope: Some(HostScope::new(
+            ProviderInstanceId::parse("mock-hsm").unwrap_or_else(|e| panic!("{e}")),
+            ProviderNamespace::parse("tenant-a").unwrap_or_else(|e| panic!("{e}")),
+        )),
         protection: Some(ProtectionClass::Hsm),
         version_model: Some(VersionModel::ProviderVersion),
         permit_extensions: false,
@@ -155,9 +162,11 @@ fn attestation_claim_is_metadata_and_never_grants_trust_by_itself() {
         source: "cloud".into(),
         reference: "claim.999".into(),
     });
-    let host = HostValidatedCapabilities::default();
+    let mut trusted = host();
+    trusted.protection = None;
+    trusted.version_model = None;
     assert_eq!(
-        caps.admit(&request(), &host),
+        caps.admit(&request(), &trusted),
         Err(CapabilityError::UnverifiedVersion)
     );
 }
@@ -336,4 +345,44 @@ fn random_order_of_capabilities_does_not_change_intersection() {
         let b = d.intersection(&c).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(a.entries, b.entries);
     }
+}
+
+#[test]
+fn cross_provider_and_cross_tenant_assurance_evidence_must_fail_closed() {
+    let trusted = host();
+    let mut other = catalog();
+    other.provider_instance = "other-hsm".into();
+    assert_eq!(
+        other.admit(&request(), &trusted),
+        Err(CapabilityError::ScopeMismatch)
+    );
+    assert_eq!(
+        catalog().intersection(&other),
+        Err(CapabilityError::ScopeMismatch)
+    );
+    other = catalog();
+    other.namespace = "tenant-b".into();
+    assert_eq!(
+        other.admit(&request(), &trusted),
+        Err(CapabilityError::ScopeMismatch)
+    );
+    assert_eq!(
+        catalog().intersection(&other),
+        Err(CapabilityError::ScopeMismatch)
+    );
+    let mut incomplete = host();
+    incomplete.scope = None;
+    assert_eq!(
+        catalog().admit(&request(), &incomplete),
+        Err(CapabilityError::ScopeMismatch)
+    );
+    let mut wrong_host = host();
+    wrong_host.scope = Some(HostScope::new(
+        ProviderInstanceId::parse("mock-hsm").unwrap_or_else(|e| panic!("{e}")),
+        ProviderNamespace::parse("tenant-b").unwrap_or_else(|e| panic!("{e}")),
+    ));
+    assert_eq!(
+        catalog().admit(&request(), &wrong_host),
+        Err(CapabilityError::ScopeMismatch)
+    );
 }
