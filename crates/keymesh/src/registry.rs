@@ -82,14 +82,16 @@ pub enum ProviderSelection {
     AnyCompatible,
 }
 
-/// Borrowed hard requirements. A key selector is never a routing hint: exact
-/// key/version preflight still occurs in execute_checked after selection.
+/// Borrowed hard requirements. The host supplies an explicit list of
+/// independently approved provider/tenant scopes. This enables opt-in
+/// AnyCompatible without inventing authority over otherwise unapproved
+/// providers. Every listed scope MUST be authenticated by the host.
 pub struct ProviderRequirements<'a> {
-    /// Independently authenticated host-approved provider/namespace context.
-    pub scope: &'a HostScope,
+    /// The provider/tenant scopes explicitly authorized by the host.
+    pub authorized_scopes: &'a [HostScope],
     /// Exact FOSS-403 algorithm, operation, payload/assurance/export request.
     pub intent: &'a OperationIntent,
-    /// Exact provider instance or explicit capability-routing opt-in.
+    /// Exact instance or explicit capability-routing opt-in.
     pub selection: &'a ProviderSelection,
 }
 
@@ -275,6 +277,16 @@ impl ProviderRegistry {
         &self, requirements: ProviderRequirements<'_>,
     ) -> Result<RoutedProvider, RouteError> {
         requirements.intent.validate().map_err(|_| RouteError::InvalidRequirements)?;
+        // Every provider is independently authorized for the same tenant.
+        // A caller cannot substitute a different tenant during AnyCompatible.
+        let Some(first) = requirements.authorized_scopes.first() else {
+            return Err(RouteError::InvalidRequirements);
+        };
+        if requirements.authorized_scopes.len() > MAX_REGISTERED_PROVIDERS
+            || requirements.authorized_scopes.iter().any(|scope| scope.namespace() != first.namespace())
+        {
+            return Err(RouteError::InvalidRequirements);
+        }
         let candidates = {
             let state = self.inner.read().map_err(|_| RouteError::RegistryUnavailable)?;
             match requirements.selection {
@@ -289,9 +301,9 @@ impl ProviderRegistry {
                 trace.reject(RejectionReason::Deregistered);
                 continue;
             }
-            if entry.scope != *requirements.scope
-                || entry.provider.instance() != requirements.scope.provider()
-                || entry.host.scope.as_ref() != Some(requirements.scope)
+            if !requirements.authorized_scopes.iter().any(|authorized| authorized == &entry.scope)
+                || entry.provider.instance() != entry.scope.provider()
+                || entry.host.scope.as_ref() != Some(&entry.scope)
             {
                 trace.reject(RejectionReason::ScopeMismatch);
                 continue;
@@ -300,7 +312,7 @@ impl ProviderRegistry {
                 trace.reject(RejectionReason::NotHealthy);
                 continue;
             }
-            let catalog = match entry.provider.capabilities(requirements.scope).await {
+            let catalog = match entry.provider.capabilities(&entry.scope).await {
                 Ok(catalog) => catalog,
                 Err(_) => {
                     trace.reject(RejectionReason::CapabilityReadFailure);
