@@ -248,14 +248,11 @@ impl ProviderOutput {
                 | O::VerifyMacMessage,
                 Self::Verification(_),
             ) => true,
-            (O::Encapsulate, Self::Encapsulation { ciphertext, .. }) => {
-                match &intent.profile {
-                    crate::AlgorithmProfile::MlKem { variant } => {
-                        u64::try_from(ciphertext.len()).ok()
-                            == Some(variant.ciphertext_bytes())
-                    }
-                    _ => false,
+            (O::Encapsulate, Self::Encapsulation { ciphertext, .. }) => match &intent.profile {
+                crate::AlgorithmProfile::MlKem { variant } => {
+                    u64::try_from(ciphertext.len()).ok() == Some(variant.ciphertext_bytes())
                 }
+                _ => false,
             },
             (
                 O::Decrypt | O::UnwrapKey | O::Decapsulate | O::DeriveKey | O::ExportPrivate,
@@ -443,7 +440,9 @@ mod tests {
             CorrelationId::parse("private-kem-ref").unwrap_or_else(|e| panic!("{e}")),
         );
         for variant in [
-            MlKemVariant::MlKem512, MlKemVariant::MlKem768, MlKemVariant::MlKem1024
+            MlKemVariant::MlKem512,
+            MlKemVariant::MlKem768,
+            MlKemVariant::MlKem1024,
         ] {
             let right = ProviderOutput::Encapsulation {
                 ciphertext: vec![0x77; variant.ciphertext_bytes() as usize],
@@ -473,4 +472,3 @@ mod tests {
         assert_eq!(e.state(), OperationState::UnknownCommitState);
     }
 }
-
