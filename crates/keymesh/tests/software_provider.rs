@@ -488,22 +488,20 @@ fn neither_digest_signing_nor_other_algorithm_is_implicitly_mapped() {
         ),
         ProviderErrorKind::InvalidInput,
     );
-    for variant in [EdDsaVariant::Ed448] {
-        let mut wrong = ed_intent(CryptoOperation::SignMessage, 3);
-        wrong.profile = AlgorithmProfile::EdDsa { variant };
-        assert_predispatch(
-            f.execute(
-                created.reference(),
-                &f.policy,
-                &wrong,
-                OperationInput::Message {
-                    bytes: b"msg",
-                    authenticator: None,
-                },
-            ),
-            ProviderErrorKind::UnsupportedOperationOrProfile,
-        );
-    }
+    let mut wrong = ed_intent(CryptoOperation::SignMessage, 3);
+    wrong.profile = AlgorithmProfile::EdDsa { variant: EdDsaVariant::Ed448 };
+    assert_predispatch(
+        f.execute(
+            created.reference(),
+            &f.policy,
+            &wrong,
+            OperationInput::Message {
+                bytes: b"msg",
+                authenticator: None,
+            },
+        ),
+        ProviderErrorKind::UnsupportedOperationOrProfile,
+    );
 }
 
 #[test]
