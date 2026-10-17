@@ -1,7 +1,8 @@
 //! Provider-neutral key identity and pre-dispatch binding contracts.
 //!
-//! This initial API does **not** perform cryptographic operations or
-//! authenticate callers. It validates identifiers and proposed bindings. See
+//! Most of this API validates identity, policy and provider binding contracts.
+//! The explicit opt-in `software-provider` feature adds ephemeral Ed25519
+//! sign/verify, not production HSM/KMS or caller authentication. See
 //! `THREAT_MODEL.md` and ADR-0001/0002 in the repository for the trust model.
 
 #![forbid(unsafe_code)]
@@ -16,6 +17,8 @@ mod identity;
 mod provider;
 mod registry;
 mod secret;
+#[cfg(feature = "software-provider")]
+mod software;
 mod uri;
 
 pub use binding::{
@@ -63,3 +66,10 @@ pub use credential::{
     CredentialRequest, CredentialSource, ScopedCredential, acquire_scoped_credential,
 };
 pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
+
+#[cfg(feature = "software-provider")]
+pub use software::{
+    CreatedSoftwareKey, MAX_SOFTWARE_KEYS, MAX_SOFTWARE_MESSAGE_BYTES, SoftwareCreateRequest,
+    SoftwareLifecycleAction, SoftwareLifecycleContext, SoftwareLifecycleGate, SoftwareProvider,
+    SoftwarePurgeRequest,
+};

@@ -57,6 +57,9 @@ jobs:
       - name: Check
         run: cargo check --workspace --all-targets --all-features --locked
 
+      - name: Check default-disabled software build
+        run: cargo check --locked -p keymesh --all-targets --no-default-features
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
@@ -77,6 +80,9 @@ jobs:
 
       - name: Execute scoped credential example
         run: cargo run --locked -p keymesh --example credential_boundary
+
+      - name: Execute opt-in real Ed25519 software example
+        run: cargo run --locked -p keymesh --features software-provider --example software_ed25519
 
       - name: Documentation
         env:
@@ -116,6 +122,9 @@ jobs:
       - name: Check workspace and examples at MSRV
         run: cargo check --workspace --all-targets --all-features --locked
 
+      - name: Check software-provider omitted at MSRV
+        run: cargo check --locked -p keymesh --all-targets --no-default-features
+
       - name: Test workspace at MSRV
         run: cargo test --workspace --all-features --locked
 
@@ -133,3 +142,6 @@ jobs:
 
       - name: Execute scoped credential example at MSRV
         run: cargo run --locked -p keymesh --example credential_boundary
+
+      - name: Execute opt-in Ed25519 software example at MSRV
+        run: cargo run --locked -p keymesh --features software-provider --example software_ed25519
