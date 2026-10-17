@@ -31,40 +31,6 @@ jobs:
       - name: Validate generated KM-02 Rust fixtures
         run: python3 scripts/generate_km02_contract.py --check
 
-  # Temporary non-publishing bootstrap aid for KM-04 dependency/format snapshot.
-  # This job is removed in the same PR before merge.
-  km04-snapshot:
-    name: KM-04 temporary lockfile and rustfmt snapshot
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout without credentials
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-        with:
-          persist-credentials: false
-      - name: Install formatter and Cargo
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
-        with:
-          toolchain: stable
-          components: rustfmt
-      - name: Resolve pinned dependencies and format code (read-only snapshot)
-        run: |
-          cargo generate-lockfile
-          cargo fmt --all
-          python3 - <<'PY'
-          import base64
-          import json
-          import pathlib
-          import subprocess
-          paths = subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines()
-          result = []
-          for path in paths:
-              raw = pathlib.Path(path).read_bytes()
-              result.append({"path": path, "base64": base64.b64encode(raw).decode("ascii")})
-          print("KM04_SNAPSHOT_BEGIN")
-          print(json.dumps(result, separators=(",", ":")))
-          print("KM04_SNAPSHOT_END")
-          PY
-
   rust-checks:
     name: Rust checks
     runs-on: ubuntu-latest
@@ -99,6 +65,9 @@ jobs:
 
       - name: Execute KeyRef URI consumer example
         run: cargo run --locked -p keymesh --example keyref_uri
+
+      - name: Execute capability admission example
+        run: cargo run --locked -p keymesh --example capability_admission
 
       - name: Documentation
         env:
@@ -143,3 +112,6 @@ jobs:
 
       - name: Execute KeyRef URI consumer example at MSRV
         run: cargo run --locked -p keymesh --example keyref_uri
+
+      - name: Execute capability admission example at MSRV
+        run: cargo run --locked -p keymesh --example capability_admission
