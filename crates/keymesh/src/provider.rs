@@ -232,8 +232,9 @@ impl fmt::Debug for ProviderOutput {
     }
 }
 impl ProviderOutput {
-    pub(crate) fn matches_operation(&self, operation: &CryptoOperation) -> bool {
+    pub(crate) fn matches_operation(&self, intent: &OperationIntent) -> bool {
         use CryptoOperation as O;
+        let operation = &intent.operation;
         match (operation, self) {
             (O::SignMessage | O::SignDigest { .. } | O::SignExternalMu, Self::Signature(v))
             | (O::Encrypt, Self::Ciphertext(v))
@@ -247,7 +248,15 @@ impl ProviderOutput {
                 | O::VerifyMacMessage,
                 Self::Verification(_),
             ) => true,
-            (O::Encapsulate, Self::Encapsulation { ciphertext, .. }) => !ciphertext.is_empty(),
+            (O::Encapsulate, Self::Encapsulation { ciphertext, .. }) => {
+                match &intent.profile {
+                    crate::AlgorithmProfile::MlKem { variant } => {
+                        u64::try_from(ciphertext.len()).ok()
+                            == Some(variant.ciphertext_bytes())
+                    }
+                    _ => false,
+                }
+            },
             (
                 O::Decrypt | O::UnwrapKey | O::Decapsulate | O::DeriveKey | O::ExportPrivate,
                 Self::Protected(_),
@@ -306,6 +315,7 @@ pub struct PreparedDispatch<'a> {
     pub(crate) intent: &'a OperationIntent,
     pub(crate) correlation: &'a CorrelationId,
     pub(crate) feature_revision: &'a str,
+    pub(crate) protocol_revision: &'a str,
 }
 impl PreparedDispatch<'_> {
     /// Concrete pinned provider target.
@@ -339,6 +349,10 @@ impl PreparedDispatch<'_> {
     /// Versioned provider feature snapshot; adapters re-check at dispatch.
     pub fn feature_revision(&self) -> &str {
         self.feature_revision
+    }
+    /// Provider-declared protocol revision; adapter must verify at dispatch.
+    pub fn protocol_revision(&self) -> &str {
+        self.protocol_revision
     }
 }
 
