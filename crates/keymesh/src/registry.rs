@@ -12,7 +12,7 @@ use crate::{
 };
 use core::fmt;
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
 /// Maximum configured provider instances in a single local registry.
@@ -207,14 +207,40 @@ struct Registration {
     scope: HostScope,
     host: HostValidatedCapabilities,
     active: AtomicBool,
-    health: AtomicU8,
+    // Upper 62 bits: host health revision; lower two: ProviderHealth.
+    // One atomic snapshot prevents Unknown -> Healthy -> Unknown ABA reuse.
+    health_epoch: AtomicU64,
 }
 impl Registration {
     fn is_live(&self) -> bool {
         self.active.load(Ordering::Acquire)
     }
+    fn health_state(&self) -> u64 {
+        self.health_epoch.load(Ordering::Acquire)
+    }
     fn health(&self) -> ProviderHealth {
-        ProviderHealth::decode(self.health.load(Ordering::Acquire))
+        ProviderHealth::decode((self.health_state() & 3) as u8)
+    }
+    fn matches_healthy_epoch(&self, expected: u64) -> bool {
+        self.is_live()
+            && self.health_state() == expected
+            && ProviderHealth::decode((expected & 3) as u8) == ProviderHealth::Healthy
+    }
+    fn change_health(&self, state: ProviderHealth) -> Result<(), RegistrationError> {
+        let mut previous = self.health_state();
+        loop {
+            let generation = previous >> 2;
+            let next_generation = generation.checked_add(1)
+                .filter(|number| *number <= (u64::MAX >> 2))
+                .ok_or(RegistrationError::RegistryUnavailable)?;
+            let next = (next_generation << 2) | u64::from(state.encode());
+            match self.health_epoch.compare_exchange_weak(
+                previous, next, Ordering::AcqRel, Ordering::Acquire
+            ) {
+                Ok(_) => return Ok(()),
+                Err(current) => previous = current,
+            }
+        }
     }
 }
 
@@ -269,7 +295,7 @@ impl ProviderRegistry {
                 provider,
                 scope,
                 host,
-                health: AtomicU8::new(health.encode()),
+                health_epoch: AtomicU64::new(u64::from(health.encode())),
                 active: AtomicBool::new(true),
             }),
         );
@@ -294,8 +320,7 @@ impl ProviderRegistry {
         if &entry.scope != scope || !entry.is_live() {
             return Err(RegistrationError::ScopeMismatch);
         }
-        entry.health.store(status.encode(), Ordering::Release);
-        Ok(())
+        entry.change_health(status)
     }
 
     /// Revoke enrollment. Any route still reading async capabilities observes
@@ -391,7 +416,8 @@ impl ProviderRegistry {
                 trace.reject(RejectionReason::ScopeMismatch);
                 continue;
             }
-            if entry.health() != ProviderHealth::Healthy {
+            let expected_health_epoch = entry.health_state();
+            if !entry.matches_healthy_epoch(expected_health_epoch) {
                 trace.reject(RejectionReason::NotHealthy);
                 continue;
             }
@@ -404,6 +430,10 @@ impl ProviderRegistry {
             };
             if !entry.is_live() {
                 trace.reject(RejectionReason::Deregistered);
+                continue;
+            }
+            if !entry.matches_healthy_epoch(expected_health_epoch) {
+                trace.reject(RejectionReason::NotHealthy);
                 continue;
             }
             let admitted = match catalog.admit(requirements.intent, &entry.host) {
@@ -420,14 +450,19 @@ impl ProviderRegistry {
                     continue;
                 }
             };
-            // Double-check provider membership, rather than returning a stale
-            // Arc after an await with a concurrent unregister/re-register.
+            // Recheck the exact health revision and provider membership.
+            // Changing health, even back to Healthy, invalidates old leases.
             if !entry.is_live() {
                 trace.reject(RejectionReason::Deregistered);
                 continue;
             }
+            if !entry.matches_healthy_epoch(expected_health_epoch) {
+                trace.reject(RejectionReason::NotHealthy);
+                continue;
+            }
             return Ok(RoutedProvider {
                 entry,
+                health_epoch: expected_health_epoch,
                 intent: requirements.intent.clone(),
                 admission: admitted,
                 trace,
@@ -441,6 +476,7 @@ impl ProviderRegistry {
 /// operation intent or host scope. Debug redacts provider/tenant/key values.
 pub struct RoutedProvider {
     entry: Arc<Registration>,
+    health_epoch: u64,
     intent: OperationIntent,
     admission: Admission,
     trace: RouteTrace,
@@ -475,7 +511,7 @@ impl RoutedProvider {
     /// Check the registration lease immediately before a new operation. A
     /// revoked route is never a valid authority after unregister.
     pub fn ensure_live(&self) -> Result<(), RouteError> {
-        if self.entry.is_live() && self.entry.health() == ProviderHealth::Healthy {
+        if self.entry.matches_healthy_epoch(self.health_epoch) {
             Ok(())
         } else {
             Err(RouteError::StaleRegistration)
@@ -504,6 +540,7 @@ impl RoutedProvider {
         let guard = RegistryPolicy {
             inner: policy,
             entry: &self.entry,
+            health_epoch: self.health_epoch,
         };
         execute_checked(self.entry.provider.as_ref(), &guard, request).await
     }
@@ -511,15 +548,16 @@ impl RoutedProvider {
 struct RegistryPolicy<'a> {
     inner: &'a dyn PolicyGate,
     entry: &'a Registration,
+    health_epoch: u64,
 }
 impl PolicyGate for RegistryPolicy<'_> {
     fn evaluate<'a>(&'a self, ctx: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyVerdict> {
         Box::pin(async move {
-            if !self.entry.is_live() || self.entry.health() != ProviderHealth::Healthy {
+            if !self.entry.matches_healthy_epoch(self.health_epoch) {
                 return Ok(PolicyVerdict::Indeterminate);
             }
             let decision = self.inner.evaluate(ctx).await?;
-            if !self.entry.is_live() || self.entry.health() != ProviderHealth::Healthy {
+            if !self.entry.matches_healthy_epoch(self.health_epoch) {
                 return Ok(PolicyVerdict::Indeterminate);
             }
             Ok(decision)
