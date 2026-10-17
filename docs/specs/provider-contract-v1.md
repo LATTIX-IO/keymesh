@@ -18,24 +18,29 @@ provider routing:
    **not** interchangeable; verification requires an explicit signature/tag.
    Bytes, secret-bearing provider error messages and request payloads are
    never copied into Keymesh diagnostics.
-3. Call side-effect-free provider `capabilities` and `resolve`, verify exact
+3. Before any provider query, verify authenticator/signature lengths for
+   RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA and HMAC. Reject oversized
+   verification proofs (global maximum 65,536 bytes) and malformed sizes.
+   ECDSA DER uses a conservative structural size bound; the adapter must
+   validate DER encoding and cryptographic correctness independently.
+4. Call side-effect-free provider `capabilities` and `resolve`, verify exact
    algorithm/profile support and host-corroborated version/custody, then
    `preflight_bind` the resource/version/material against the host scope.
    Any mismatch terminates **before** the operation dispatch.
-4. Call the mandatory, host-injected async `PolicyGate` with a safe view of
+5. Call the mandatory, host-injected async `PolicyGate` with a safe view of
    the scope, reference, resolved key and capability snapshot. A denial,
    missing/unknown verdict, timeout expressed as an error, or evaluation error
    **prevents operation dispatch**. This library does not contain a policy
    evaluator or independently establish host identity.
-5. Construct a private-constructor `PreparedDispatch` that retains the exact
+6. Construct a private-constructor `PreparedDispatch` that retains the exact
    target, operation, and provider feature **and protocol** revisions. A provider adapter MUST
    use that target, not its mutable alias, and MUST recheck actual
    key-material/version selection at the native boundary.
-6. Invoke exactly one discrete provider trait method: sign, verify, encrypt,
+7. Invoke exactly one discrete provider trait method: sign, verify, encrypt,
    decrypt, wrap, unwrap, MAC, KEM, derive or lifecycle. Every method defaults
    to Unsupported with no operation side effect; there is **no implicit
    software fallback**.
-7. Compare the provider-reported target with the preflight target and check
+8. Compare the provider-reported target with the preflight target and check
    that the response kind matches the exact operation, including exact
    FIPS 203 ML-KEM encapsulation ciphertext size. Return operation-bound
    `OperationEvidence` only after a confirmed result. Invalid post-dispatch
@@ -70,6 +75,9 @@ timeouts after possible submission. Dropping/cancelling the caller's future
 does not confirm remote cancellation, and may leave an unknown commit state
 without a returned result. For mutation/retry safety the host needs a durable
 request record, provider idempotency capability or reconciliation read (KM-18).
+The checked gateway normalizes errors from read-only capability/resolve
+calls to NotDispatched, including read timeouts. Those calls are contractually
+side-effect-free, so they cannot establish an ambiguous cryptographic commit.
 An adapter MUST NOT manufacture NotDispatched merely because a local future
 was cancelled. Static Debug/Display outputs never expose provider SDK
 responses, arbitrary backend errors, bearer tokens or payload bytes.
