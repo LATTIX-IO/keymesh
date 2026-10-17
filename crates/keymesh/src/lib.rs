@@ -13,6 +13,7 @@ mod capability;
 mod execution;
 mod identity;
 mod provider;
+mod registry;
 mod uri;
 
 pub use binding::{
@@ -47,4 +48,10 @@ pub use provider::{
     CorrelationId, KeyProvider, OperationState, PreparedDispatch, ProtectedResultRef,
     ProviderError, ProviderErrorKind, ProviderFuture, ProviderOutput, ProviderReply,
     RetryDisposition,
+};
+
+pub use registry::{
+    MAX_REGISTERED_PROVIDERS, ProviderHealth, ProviderRegistry, ProviderRequirements,
+    ProviderSelection, RegistrationError, RejectionReason, RouteError, RouteTrace,
+    RoutedProvider,
 };
