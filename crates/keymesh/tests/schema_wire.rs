@@ -1,8 +1,7 @@
 //! Golden JSON API/schema compatibility and safe opaque extension roundtrips.
 use keymesh::{
-    AlgorithmProfile, CapabilityError, CryptoOperation, ExportRequirement, ExtensionProfile,
-    OperationIntent, PayloadDescriptor, ProviderCapabilities,
-    CAPABILITY_SCHEMA_VERSION,
+    AlgorithmProfile, CAPABILITY_SCHEMA_VERSION, CapabilityError, CryptoOperation,
+    ExportRequirement, ExtensionProfile, OperationIntent, PayloadDescriptor, ProviderCapabilities,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -11,8 +10,8 @@ const GOLDEN: &str = include_str!("../../../tests/fixtures/capability_schema_v1.
 
 #[test]
 fn golden_capability_schema_v1_deserializes_and_roundtrips_losslessly() {
-    let parsed: ProviderCapabilities = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("capability fixture invalid: {e}"));
+    let parsed: ProviderCapabilities =
+        serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("capability fixture invalid: {e}"));
     assert_eq!(parsed.schema_version, CAPABILITY_SCHEMA_VERSION);
     assert_eq!(parsed.entries.len(), 7);
     assert!(parsed.validate().is_ok());
@@ -21,10 +20,10 @@ fn golden_capability_schema_v1_deserializes_and_roundtrips_losslessly() {
     let canonical: ProviderCapabilities = serde_json::from_str(&serialized)
         .unwrap_or_else(|e| panic!("golden fixture roundtrip failed: {e}"));
     assert_eq!(parsed, canonical);
-    let golden_json: Value = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("invalid JSON value: {e}"));
-    let roundtrip_json: Value = serde_json::from_str(&serialized)
-        .unwrap_or_else(|e| panic!("invalid emitted JSON: {e}"));
+    let golden_json: Value =
+        serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("invalid JSON value: {e}"));
+    let roundtrip_json: Value =
+        serde_json::from_str(&serialized).unwrap_or_else(|e| panic!("invalid emitted JSON: {e}"));
     assert_eq!(golden_json, roundtrip_json);
 }
 #[test]
@@ -37,8 +36,8 @@ fn explicitly_namespaced_unknown_extension_values_preserved() {
         identifier: "algorithm_42".into(),
         parameters: params,
     });
-    let encoded = serde_json::to_string(&extension)
-        .unwrap_or_else(|e| panic!("serialization failed: {e}"));
+    let encoded =
+        serde_json::to_string(&extension).unwrap_or_else(|e| panic!("serialization failed: {e}"));
     let parsed: AlgorithmProfile = serde_json::from_str(&encoded)
         .unwrap_or_else(|e| panic!("extension roundtrip failed: {e}"));
     assert_eq!(extension, parsed);
@@ -53,17 +52,17 @@ fn unknown_top_level_algorithm_or_operation_discriminator_is_rejected() {
 }
 #[test]
 fn backward_incompatible_or_unknown_capability_schema_fails_closed() {
-    let mut source: Value = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("fixture JSON failed: {e}"));
+    let mut source: Value =
+        serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("fixture JSON failed: {e}"));
     source["schema_version"] = json!(2);
-    let parsed: ProviderCapabilities = serde_json::from_value(source)
-        .unwrap_or_else(|e| panic!("schema parse failed: {e}"));
+    let parsed: ProviderCapabilities =
+        serde_json::from_value(source).unwrap_or_else(|e| panic!("schema parse failed: {e}"));
     assert_eq!(parsed.validate(), Err(CapabilityError::InvalidCatalog));
 }
 #[test]
 fn schema_rejects_unexpected_provider_response_fields() {
-    let mut source: Value = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("fixture JSON failed: {e}"));
+    let mut source: Value =
+        serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("fixture JSON failed: {e}"));
     source["private_key"] = json!("DO_NOT_COPY_SECRETS");
     assert!(serde_json::from_value::<ProviderCapabilities>(source).is_err());
 }
@@ -92,10 +91,13 @@ fn request_schema_serialization_preserves_input_form_and_exact_binding() {
 }
 #[test]
 fn neither_unknown_extensions_nor_implicit_private_export_can_be_dispatched() {
-    let source: ProviderCapabilities = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("fixture invalid: {e}"));
-    let extension_entry = source.entries.last()
-        .unwrap_or_else(|| panic!("missing test extension")).clone();
+    let source: ProviderCapabilities =
+        serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("fixture invalid: {e}"));
+    let extension_entry = source
+        .entries
+        .last()
+        .unwrap_or_else(|| panic!("missing test extension"))
+        .clone();
     let request = OperationIntent {
         operation: extension_entry.operation,
         profile: extension_entry.profile,
@@ -121,11 +123,10 @@ fn neither_unknown_extensions_nor_implicit_private_export_can_be_dispatched() {
 }
 #[test]
 fn error_types_are_redacted_and_never_echo_credentials() {
-    let mut source: Value = serde_json::from_str(GOLDEN)
-        .unwrap_or_else(|e| panic!("{e}"));
+    let mut source: Value = serde_json::from_str(GOLDEN).unwrap_or_else(|e| panic!("{e}"));
     source["feature_revision"] = json!("PRIVATE_TOKEN_DO_NOT_ECHO");
-    let bad: ProviderCapabilities = serde_json::from_value(source)
-        .unwrap_or_else(|e| panic!("{e}"));
+    let bad: ProviderCapabilities =
+        serde_json::from_value(source).unwrap_or_else(|e| panic!("{e}"));
     let e = bad.validate().unwrap_err();
     assert!(!format!("{e:?} {e}").contains("PRIVATE_TOKEN_DO_NOT_ECHO"));
 }
