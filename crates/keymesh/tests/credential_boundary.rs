@@ -1,11 +1,11 @@
 //! FOSS-408 regression contract: no host-denied credential callback, no
 //! cross-provider/tenant/operation credential reuse, no actual cloud/HSM calls.
 use keymesh::{
-    AlgorithmProfile, CredentialAuthorization, CredentialError, CredentialFuture, CredentialPurpose,
-    CredentialRequest, CredentialSource, CryptoOperation, DigestAlgorithm, ExportRequirement,
-    HostScope, OperationIntent, PayloadDescriptor, PolicyVerdict, ProtectionRequirement,
-    ProviderInstanceId, ProviderNamespace, ScopedCredential, SecretBytes, VersionRequirement,
-    acquire_scoped_credential,
+    AlgorithmProfile, CredentialAuthorization, CredentialError, CredentialFuture,
+    CredentialPurpose, CredentialRequest, CredentialSource, CryptoOperation, DigestAlgorithm,
+    ExportRequirement, HostScope, OperationIntent, PayloadDescriptor, PolicyVerdict,
+    ProtectionRequirement, ProviderInstanceId, ProviderNamespace, ScopedCredential, SecretBytes,
+    VersionRequirement, acquire_scoped_credential,
 };
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
@@ -83,7 +83,8 @@ impl CredentialSource for FakeSource {
         &self.namespace
     }
     fn acquire<'a>(
-        &'a self, request: &'a CredentialRequest<'_>,
+        &'a self,
+        request: &'a CredentialRequest<'_>,
     ) -> CredentialFuture<'a, ScopedCredential> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Box::pin(async move {
@@ -135,7 +136,8 @@ impl FakeGate {
 }
 impl CredentialAuthorization for FakeGate {
     fn authorize<'a>(
-        &'a self, request: &'a CredentialRequest<'_>,
+        &'a self,
+        request: &'a CredentialRequest<'_>,
     ) -> CredentialFuture<'a, PolicyVerdict> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(request.intent.operation, *request.operation);
@@ -193,7 +195,11 @@ impl Fixture {
         }
     }
     fn acquire(&self) -> Result<ScopedCredential, CredentialError> {
-        drive(acquire_scoped_credential(&self.source, &self.gate, self.request()))
+        drive(acquire_scoped_credential(
+            &self.source,
+            &self.gate,
+            self.request(),
+        ))
     }
     fn requested(&self) -> usize {
         self.source.calls.load(Ordering::SeqCst)
@@ -205,15 +211,17 @@ fn approved_scoped_secret_is_owned_redacted_and_cannot_be_implicitly_copied() {
     let credential = fixture.acquire().unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(credential.scope(), &fixture.scope);
     assert_eq!(credential.operation(), &fixture.operation);
-    assert_eq!(credential.purpose(), CredentialPurpose::ProviderAuthentication);
+    assert_eq!(
+        credential.purpose(),
+        CredentialPurpose::ProviderAuthentication
+    );
     assert_eq!(credential.len(), b"fixture-credential-not-production".len());
     assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 1);
     assert_eq!(fixture.requested(), 1);
     credential.with_exposed(|borrowed| {
         assert_eq!(borrowed, b"fixture-credential-not-production");
     });
-    let rendered = format!("{credential:?} {:?}",
-        CredentialError::Unavailable);
+    let rendered = format!("{credential:?} {:?}", CredentialError::Unavailable);
     assert!(!rendered.contains("fixture-credential-not-production"));
     assert!(!rendered.contains("mock-hsm"));
     assert!(!rendered.contains("tenant-a"));
@@ -230,7 +238,10 @@ fn provider_and_tenant_mismatches_never_reach_policy_or_source() {
             4 => fixture.source.namespace = namespace("tenant-b"),
             _ => unreachable!(),
         }
-        assert!(matches!(fixture.acquire(), Err(CredentialError::ScopeMismatch)));
+        assert!(matches!(
+            fixture.acquire(),
+            Err(CredentialError::ScopeMismatch)
+        ));
         assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 0);
         assert_eq!(fixture.requested(), 0);
     }
@@ -239,15 +250,22 @@ fn provider_and_tenant_mismatches_never_reach_policy_or_source() {
 fn operation_tampering_and_invalid_intent_never_trigger_credential_fetch() {
     let mut fixture = Fixture::new();
     fixture.operation = CryptoOperation::Encrypt;
-    assert!(matches!(fixture.acquire(), Err(CredentialError::ScopeMismatch)));
+    assert!(matches!(
+        fixture.acquire(),
+        Err(CredentialError::ScopeMismatch)
+    ));
     assert_eq!(fixture.requested(), 0);
     assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 0);
 
     let mut fixture = Fixture::new();
     fixture.intent.payload = PayloadDescriptor::Digest {
-        algorithm: DigestAlgorithm::Sha256, bytes: 31,
+        algorithm: DigestAlgorithm::Sha256,
+        bytes: 31,
     };
-    assert!(matches!(fixture.acquire(), Err(CredentialError::InvalidIntent)));
+    assert!(matches!(
+        fixture.acquire(),
+        Err(CredentialError::InvalidIntent)
+    ));
     assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 0);
     assert_eq!(fixture.requested(), 0);
 }
@@ -280,21 +298,34 @@ fn mismatched_source_response_is_dropped_not_returned_as_credential() {
     ] {
         let mut fixture = Fixture::new();
         fixture.source.behavior = behavior;
-        assert!(matches!(fixture.acquire(), Err(CredentialError::ScopeMismatch)));
+        assert!(matches!(
+            fixture.acquire(),
+            Err(CredentialError::ScopeMismatch)
+        ));
         assert_eq!(fixture.requested(), 1);
     }
     let mut fixture = Fixture::new();
     fixture.source.behavior = SourceBehavior::Erased;
-    assert!(matches!(fixture.acquire(), Err(CredentialError::InvalidMaterial)));
+    assert!(matches!(
+        fixture.acquire(),
+        Err(CredentialError::InvalidMaterial)
+    ));
     assert_eq!(fixture.requested(), 1);
 }
 #[test]
 fn unavailability_is_typed_and_does_not_trigger_fallback() {
     let mut fixture = Fixture::new();
     fixture.source.behavior = SourceBehavior::Unavailable;
-    assert!(matches!(fixture.acquire(), Err(CredentialError::Unavailable)));
+    assert!(matches!(
+        fixture.acquire(),
+        Err(CredentialError::Unavailable)
+    ));
     assert_eq!(fixture.requested(), 1);
-    let formatted = format!("{:?} {}", CredentialError::Unavailable, CredentialError::Unavailable);
+    let formatted = format!(
+        "{:?} {}",
+        CredentialError::Unavailable,
+        CredentialError::Unavailable
+    );
     assert!(!formatted.contains("fixture-credential-not-production"));
 }
 #[test]
@@ -309,24 +340,31 @@ fn dropped_future_never_calls_credential_source_before_authorization_completes()
     let future = acquire_scoped_credential(&fixture.source, &fixture.gate, fixture.request());
     let mut future = Box::pin(future);
     let mut cx = Context::from_waker(Waker::noop());
-    assert!(matches!(Pin::as_mut(&mut future).poll(&mut cx), Poll::Pending));
+    assert!(matches!(
+        Pin::as_mut(&mut future).poll(&mut cx),
+        Poll::Pending
+    ));
     assert_eq!(fixture.requested(), 0);
     drop(future);
     assert_eq!(fixture.requested(), 0);
 }
 #[test]
 fn isolated_thread_requests_do_not_cross_tenant_scope() {
-    let handles: Vec<_> = (0..20).map(|_| {
-        std::thread::spawn(|| {
-            let fixture = Fixture::new();
-            let mut credential = fixture.acquire().unwrap_or_else(|e| panic!("{e}"));
-            assert_eq!(credential.scope(), &fixture.scope);
-            credential.erase();
-            assert!(credential.is_empty());
-            assert_eq!(fixture.requested(), 1);
+    let handles: Vec<_> = (0..20)
+        .map(|_| {
+            std::thread::spawn(|| {
+                let fixture = Fixture::new();
+                let mut credential = fixture.acquire().unwrap_or_else(|e| panic!("{e}"));
+                assert_eq!(credential.scope(), &fixture.scope);
+                credential.erase();
+                assert!(credential.is_empty());
+                assert_eq!(fixture.requested(), 1);
+            })
         })
-    }).collect();
+        .collect();
     for thread in handles {
-        thread.join().unwrap_or_else(|_| panic!("credential worker panicked"));
+        thread
+            .join()
+            .unwrap_or_else(|_| panic!("credential worker panicked"));
     }
 }
