@@ -141,12 +141,25 @@ impl fmt::Debug for SecretBytes {
 /// let material = KeyMaterial::from_vec(vec![0x42; 32]).unwrap();
 /// let _leak = serde_json::to_string(&material).unwrap();
 /// ```
+///
+/// No implicit bypass of KM-05's raw-key dispatch guard:
+///
+/// ```compile_fail
+/// use keymesh::{KeyMaterial, OperationInput};
+/// let key = KeyMaterial::from_vec(vec![0x42; 32]).unwrap();
+/// let _input = OperationInput::KeyMaterial(&key);
+/// ```
+
 #[must_use = "key material remains sensitive until erased"]
 pub struct KeyMaterial(SecretBytes);
 impl KeyMaterial {
-    /// Convert an existing bounded secret owner without duplicating bytes.
-    pub fn new(secret: SecretBytes) -> Self {
-        Self(secret)
+    /// Convert an existing bounded nonempty secret without duplicating bytes.
+    /// An already-erased buffer is rejected and dropped (not reactivated).
+    pub fn new(secret: SecretBytes) -> Result<Self, SecretError> {
+        if secret.is_empty() {
+            return Err(SecretError::Empty);
+        }
+        Ok(Self(secret))
     }
 
     /// Move in raw key bytes and enforce the same limits as SecretBytes.
@@ -232,6 +245,14 @@ mod tests {
                 .len(),
             MAX_SECRET_BYTES
         );
+    }
+
+    #[test]
+    fn key_material_cannot_reactivate_erased_allocation() {
+        let mut owner = SecretBytes::from_vec(vec![0x44; 32])
+            .unwrap_or_else(|e| panic!("{e}"));
+        owner.erase();
+        assert!(matches!(KeyMaterial::new(owner), Err(SecretError::Empty)));
     }
 
     #[test]
