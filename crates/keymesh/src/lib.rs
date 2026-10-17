@@ -10,10 +10,12 @@
 mod algorithm;
 mod binding;
 mod capability;
+mod credential;
 mod execution;
 mod identity;
 mod provider;
 mod registry;
+mod secret;
 mod uri;
 
 pub use binding::{
@@ -54,4 +56,10 @@ pub use registry::{
     MAX_REGISTERED_PROVIDERS, ProviderHealth, ProviderRegistry, ProviderRequirements,
     ProviderSelection, RegistrationError, RejectionReason, RouteError, RouteTrace, RoutedProvider,
     RoutingFailure,
+};
+
+pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
+pub use credential::{
+    CredentialAuthorization, CredentialError, CredentialFuture, CredentialPurpose,
+    CredentialRequest, CredentialSource, ScopedCredential, acquire_scoped_credential,
 };
