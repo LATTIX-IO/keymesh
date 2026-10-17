@@ -225,10 +225,24 @@ impl std::fmt::Display for CapabilityError {
 impl std::error::Error for CapabilityError {}
 
 fn revision_safe(s: &str) -> bool {
+    let lower = s.to_ascii_lowercase();
     !s.is_empty()
         && s.len() <= 96
         && s.bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b':'))
+        && ![
+            "token",
+            "secret",
+            "password",
+            "credential",
+            "bearer",
+            "authorization",
+            "api_key",
+            "apikey",
+            "access_key",
+        ]
+        .iter()
+        .any(|needle| lower.contains(needle))
 }
 fn claim_safe(claim: &AttestationClaim) -> bool {
     revision_safe(&claim.kind) && revision_safe(&claim.source) && revision_safe(&claim.reference)
@@ -279,12 +293,11 @@ impl ProviderCapabilities {
     ) -> Result<Admission, CapabilityError> {
         self.validate()?;
         intent.validate().map_err(CapabilityError::InvalidIntent)?;
-        if matches!(intent.profile, AlgorithmProfile::Extension(_))
-            || matches!(intent.operation, CryptoOperation::Extension { .. })
+        if (matches!(intent.profile, AlgorithmProfile::Extension(_))
+            || matches!(intent.operation, CryptoOperation::Extension { .. }))
+            && !host.permit_extensions
         {
-            if !host.permit_extensions {
-                return Err(CapabilityError::ExtensionNotPermitted);
-            }
+            return Err(CapabilityError::ExtensionNotPermitted);
         }
         if !self.reported_version_model.supports(intent.binding)
             || !host
