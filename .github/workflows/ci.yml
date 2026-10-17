@@ -66,6 +66,9 @@ jobs:
       - name: Execute KeyRef URI consumer example
         run: cargo run --locked -p keymesh --example keyref_uri
 
+      - name: Execute capability admission example
+        run: cargo run --locked -p keymesh --example capability_admission
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -109,3 +112,6 @@ jobs:
 
       - name: Execute KeyRef URI consumer example at MSRV
         run: cargo run --locked -p keymesh --example keyref_uri
+
+      - name: Execute capability admission example at MSRV
+        run: cargo run --locked -p keymesh --example capability_admission

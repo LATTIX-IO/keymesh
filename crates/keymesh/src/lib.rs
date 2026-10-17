@@ -7,7 +7,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+mod algorithm;
 mod binding;
+mod capability;
 mod identity;
 mod uri;
 
@@ -22,3 +24,15 @@ pub use identity::{
 };
 
 pub use uri::{KeyRefUriError, MAX_KEY_REF_URI_BYTES};
+
+pub use algorithm::{
+    AesWrapVariant, AlgorithmProfile, CryptoOperation, DigestAlgorithm, EcCurve, EcdsaEncoding,
+    EdDsaVariant, ExportRequirement, ExtensionProfile, MlDsaInput, MlDsaVariant, MlKemVariant,
+    OperationIntent, PayloadDescriptor, ProfileError, ProtectionRequirement, SlhDsaVariant,
+    VersionRequirement,
+};
+pub use capability::{
+    Admission, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CapabilityError,
+    Exportability, HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, ProtectionClass,
+    ProviderCapabilities, SupportStatus, VersionModel,
+};
