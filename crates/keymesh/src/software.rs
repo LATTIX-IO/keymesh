@@ -52,9 +52,7 @@ fn valid_software_host(
         && host.protection == Some(ProtectionClass::Software)
         && host.version_model == Some(VersionModel::ProviderVersion)
 }
-fn policy_result(
-    verdict: Result<PolicyVerdict, ProviderError>,
-) -> Result<(), ProviderError> {
+fn policy_result(verdict: Result<PolicyVerdict, ProviderError>) -> Result<(), ProviderError> {
     match verdict {
         Ok(PolicyVerdict::Permit) => Ok(()),
         Ok(PolicyVerdict::Deny) => Err(denied(ProviderErrorKind::PolicyDenied)),
@@ -252,7 +250,9 @@ impl SoftwareProvider {
         let public_key = {
             let seed_bytes = <&[u8; 32]>::try_from(seed.as_slice())
                 .map_err(|_| denied(ProviderErrorKind::InvalidInput))?;
-            SigningKey::from_bytes(seed_bytes).verifying_key().to_bytes()
+            SigningKey::from_bytes(seed_bytes)
+                .verifying_key()
+                .to_bytes()
         };
         // Own one KeyMaterial; the scratch seed zeroizes independently at Drop.
         let material = KeyMaterial::from_vec(std::mem::take(&mut *seed))
@@ -316,12 +316,15 @@ impl SoftwareProvider {
                 .keys
                 .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let key = keys.get(request.reference.logical_key())
+            let key = keys
+                .get(request.reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if key.target != (DispatchTarget::ProviderVersion {
-                resource: resource.clone(),
-                version: version.clone(),
-            }) {
+            if key.target
+                != (DispatchTarget::ProviderVersion {
+                    resource: resource.clone(),
+                    version: version.clone(),
+                })
+            {
                 return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
             }
         }
@@ -339,10 +342,12 @@ impl SoftwareProvider {
         let stored = keys
             .get(request.reference.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        if stored.target != (DispatchTarget::ProviderVersion {
-            resource: resource.clone(),
-            version: version.clone(),
-        }) {
+        if stored.target
+            != (DispatchTarget::ProviderVersion {
+                resource: resource.clone(),
+                version: version.clone(),
+            })
+        {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
         }
         keys.remove(request.reference.logical_key());
@@ -367,7 +372,9 @@ impl SoftwareProvider {
         let entry = keys
             .get(request.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        if &entry.target != request.target() || !matches!(entry.target, DispatchTarget::ProviderVersion { .. }) {
+        if &entry.target != request.target()
+            || !matches!(entry.target, DispatchTarget::ProviderVersion { .. })
+        {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
         }
         Ok(entry)
@@ -383,7 +390,10 @@ impl KeyProvider for SoftwareProvider {
         &self.instance
     }
 
-    fn capabilities<'a>(&'a self, scope: &'a HostScope) -> ProviderFuture<'a, ProviderCapabilities> {
+    fn capabilities<'a>(
+        &'a self,
+        scope: &'a HostScope,
+    ) -> ProviderFuture<'a, ProviderCapabilities> {
         Box::pin(async move {
             if !self.matches_scope(scope) {
                 return Err(denied(ProviderErrorKind::ScopeMismatch));
@@ -446,10 +456,12 @@ impl KeyProvider for SoftwareProvider {
             let key = keys
                 .get(reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if key.target != (DispatchTarget::ProviderVersion {
-                resource: resource.clone(),
-                version: version.clone(),
-            }) {
+            if key.target
+                != (DispatchTarget::ProviderVersion {
+                    resource: resource.clone(),
+                    version: version.clone(),
+                })
+            {
                 return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
             }
             Ok(ResolvedKey::new(
@@ -471,8 +483,10 @@ impl KeyProvider for SoftwareProvider {
                 return Err(denied(ProviderErrorKind::UnsupportedOperationOrProfile));
             }
             let message = match input {
-                OperationInput::Message { bytes, authenticator: None }
-                    if bytes.len() as u64 <= MAX_SOFTWARE_MESSAGE_BYTES => *bytes,
+                OperationInput::Message {
+                    bytes,
+                    authenticator: None,
+                } if bytes.len() as u64 <= MAX_SOFTWARE_MESSAGE_BYTES => *bytes,
                 _ => return Err(denied(ProviderErrorKind::InvalidInput)),
             };
             // Synchronous lock is held only during native signing; no await
@@ -489,8 +503,7 @@ impl KeyProvider for SoftwareProvider {
                     signature = Some(signer.sign(message).to_bytes().to_vec());
                 }
             });
-            let signature = signature
-                .ok_or_else(|| denied(ProviderErrorKind::Unavailable))?;
+            let signature = signature.ok_or_else(|| denied(ProviderErrorKind::Unavailable))?;
             Ok(ProviderReply::new(
                 request.target().clone(),
                 ProviderOutput::Signature(signature),
@@ -509,9 +522,12 @@ impl KeyProvider for SoftwareProvider {
                 return Err(denied(ProviderErrorKind::UnsupportedOperationOrProfile));
             }
             let (message, raw_signature) = match input {
-                OperationInput::Message { bytes, authenticator: Some(sig) }
-                    if bytes.len() as u64 <= MAX_SOFTWARE_MESSAGE_BYTES
-                        && sig.len() == 64 => (*bytes, *sig),
+                OperationInput::Message {
+                    bytes,
+                    authenticator: Some(sig),
+                } if bytes.len() as u64 <= MAX_SOFTWARE_MESSAGE_BYTES && sig.len() == 64 => {
+                    (*bytes, *sig)
+                }
                 _ => return Err(denied(ProviderErrorKind::InvalidInput)),
             };
             let keys = self
@@ -609,7 +625,12 @@ mod tests {
             assert!(signer.verifying_key().verify_strict(message, &sig).is_ok());
             let mut changed = message.to_vec();
             changed.push(0xff);
-            assert!(signer.verifying_key().verify_strict(&changed, &sig).is_err());
+            assert!(
+                signer
+                    .verifying_key()
+                    .verify_strict(&changed, &sig)
+                    .is_err()
+            );
         }
     }
 }
