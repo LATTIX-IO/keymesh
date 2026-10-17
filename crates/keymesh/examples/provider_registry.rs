@@ -1,11 +1,11 @@
 //! FOSS-407 explicit provider routing example. Fake capability data only.
 //! No KMS calls, encryption, signing or host attestation occur.
 use keymesh::{
-    AlgorithmProfile, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CryptoOperation,
-    DigestAlgorithm, ExportRequirement, Exportability, HostScope, HostValidatedCapabilities,
-    KeyProvider, KeyRef, OperationIntent, PayloadDescriptor, ProtectionClass,
-    ProtectionRequirement, ProviderCapabilities, ProviderError, ProviderErrorKind, ProviderFuture,
-    ProviderHealth, ProviderInstanceId, ProviderNamespace, ProviderRegistry, ProviderRequirements,
+    AlgorithmProfile, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CryptoOperation, DigestAlgorithm,
+    ExportRequirement, Exportability, HostScope, HostValidatedCapabilities, KeyProvider, KeyRef,
+    OperationIntent, PayloadDescriptor, ProtectionClass, ProtectionRequirement,
+    ProviderCapabilities, ProviderError, ProviderErrorKind, ProviderFuture, ProviderHealth,
+    ProviderInstanceId, ProviderNamespace, ProviderRegistry, ProviderRequirements,
     ProviderSelection, ResolvedKey, SupportStatus, VersionModel, VersionRequirement,
 };
 use std::future::Future;
@@ -28,15 +28,20 @@ struct Fake {
     catalog: ProviderCapabilities,
 }
 impl KeyProvider for Fake {
-    fn instance(&self) -> &ProviderInstanceId { &self.instance }
-    fn capabilities<'a>(&'a self, _scope: &'a HostScope)
-        -> ProviderFuture<'a, ProviderCapabilities>
-    {
+    fn instance(&self) -> &ProviderInstanceId {
+        &self.instance
+    }
+    fn capabilities<'a>(
+        &'a self,
+        _scope: &'a HostScope,
+    ) -> ProviderFuture<'a, ProviderCapabilities> {
         Box::pin(async move { Ok(self.catalog.clone()) })
     }
-    fn resolve<'a>(&'a self, _scope: &'a HostScope, _key: &'a KeyRef)
-        -> ProviderFuture<'a, ResolvedKey>
-    {
+    fn resolve<'a>(
+        &'a self,
+        _scope: &'a HostScope,
+        _key: &'a KeyRef,
+    ) -> ProviderFuture<'a, ResolvedKey> {
         Box::pin(async {
             Err(ProviderError::not_dispatched(
                 ProviderErrorKind::UnsupportedOperationOrProfile,
@@ -61,8 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ..Default::default()
         };
         let profile = AlgorithmProfile::RsaPss {
-            modulus_bits: 3072, digest: DigestAlgorithm::Sha256,
-            mgf1_digest: DigestAlgorithm::Sha256, salt_bytes: 32,
+            modulus_bits: 3072,
+            digest: DigestAlgorithm::Sha256,
+            mgf1_digest: DigestAlgorithm::Sha256,
+            salt_bytes: 32,
         };
         let provider: Arc<dyn KeyProvider> = Arc::new(Fake {
             instance,
@@ -90,13 +97,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         allowed.push(scope);
     }
     let requested = OperationIntent {
-        operation: CryptoOperation::SignDigest { digest: DigestAlgorithm::Sha256 },
+        operation: CryptoOperation::SignDigest {
+            digest: DigestAlgorithm::Sha256,
+        },
         profile: AlgorithmProfile::RsaPss {
-            modulus_bits: 3072, digest: DigestAlgorithm::Sha256,
-            mgf1_digest: DigestAlgorithm::Sha256, salt_bytes: 32,
+            modulus_bits: 3072,
+            digest: DigestAlgorithm::Sha256,
+            mgf1_digest: DigestAlgorithm::Sha256,
+            salt_bytes: 32,
         },
         payload: PayloadDescriptor::Digest {
-            algorithm: DigestAlgorithm::Sha256, bytes: 32,
+            algorithm: DigestAlgorithm::Sha256,
+            bytes: 32,
         },
         binding: VersionRequirement::ProviderVersion,
         protection: ProtectionRequirement::Hsm,
@@ -113,7 +125,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(routed.instance().as_str(), "b-hsm");
     println!(
         "Selected provider {} after {} denied candidates; no crypto dispatched",
-        routed.instance().as_str(), routed.trace().rejected
+        routed.instance().as_str(),
+        routed.trace().rejected
     );
     println!("Mock custody/health values are NOT cryptographic attestations.");
     Ok(())
