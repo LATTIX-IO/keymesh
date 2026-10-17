@@ -304,6 +304,8 @@ pub enum CryptoOperation {
     Purge,
     /// Export only public key material.
     ExportPublic,
+    /// Export private or secret material, independently approved and feature-gated.
+    ExportPrivate,
     /// Explicit vendor operation extension, never dispatched by default.
     Extension {
         /// Vendor or standards namespace.
@@ -314,7 +316,7 @@ pub enum CryptoOperation {
 }
 
 /// Metadata about supplied input; never carries plaintext, private keys or secrets.
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 #[serde(tag = "form", content = "parameters", rename_all = "snake_case")]
 pub enum PayloadDescriptor {
     /// No operation payload.
@@ -560,6 +562,17 @@ impl OperationIntent {
         use CryptoOperation as O;
         use PayloadDescriptor as P;
         self.profile.validate()?;
+        if matches!(self.operation, O::ExportPublic) && self.export != ExportRequirement::Public {
+            return Err(ProfileError::OperationMismatch);
+        }
+        if matches!(self.operation, O::ExportPrivate) && self.export != ExportRequirement::Private {
+            return Err(ProfileError::OperationMismatch);
+        }
+        if !matches!(self.operation, O::ExportPublic | O::ExportPrivate)
+            && self.export != ExportRequirement::None
+        {
+            return Err(ProfileError::OperationMismatch);
+        }
         if let O::Extension { namespace, identifier } = &self.operation {
             if !allowed_extension_label(namespace) || !allowed_extension_label(identifier) {
                 return Err(ProfileError::InvalidExtension);
@@ -573,11 +586,11 @@ impl OperationIntent {
         // is metadata only and never transported through this type.
         match &self.operation {
             O::Generate | O::Rotate | O::Enable | O::Disable | O::ScheduleDelete | O::Recover
-            | O::Purge | O::ExportPublic => {
+            | O::Purge | O::ExportPublic | O::ExportPrivate => {
                 if !matches!(self.payload, P::None) {
                     return Err(ProfileError::PayloadMismatch);
                 }
-                if matches!(self.operation, O::ExportPublic)
+                if matches!(self.operation, O::ExportPublic | O::ExportPrivate)
                     && matches!(
                         self.profile,
                         A::AesGcm { .. } | A::AesKeyWrap { .. } | A::Hmac { .. } | A::Hkdf { .. }
@@ -694,13 +707,6 @@ impl OperationIntent {
             _ => false,
         };
         if !allowed {
-            return Err(ProfileError::OperationMismatch);
-        }
-        // Export is a separate explicitly granted operation; this schema
-        // never permits secret export merely because signing is supported.
-        if self.export == ExportRequirement::Private
-            && !matches!(self.operation, O::Import | O::Generate | O::Rotate)
-        {
             return Err(ProfileError::OperationMismatch);
         }
         Ok(())
