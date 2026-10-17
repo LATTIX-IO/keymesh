@@ -15,7 +15,8 @@ Status: FOSS-404 / KM-05 pre-release API baseline. This matrix reports
 | Provider operation success evidence | KM-05 metadata contract | Fake only | Exact target/output/category validation |
 | Unknown commit, cancellation and conservative retry classification | KM-05 contract | Fake only | Before/after dispatch future cancellation |
 | Side-effect-free provider capability/resolve reads | KM-05 required trait contract | Fake only | Adapter author obligation |
-| Provider registry, routing / circuit breakers | Not implemented | No | KM-06 planned |
+| Explicit provider registry / deterministic capability routing | KM-06, yes | Fake only | Scoped health/assurance, no fallback, removal races |
+| Native health probe, circuit breakers or physical revocation | Not implemented | No | KM-18 and provider adapters |
 | Credential broker / sensitive material ownership and zeroization | Not implemented | No | KM-07 planned |
 | Software EdDSA/RSA/ECDSA primitives | Not implemented | No | KM-08 planned |
 | PKCS#11 hardware modules or cloud KMS integration | Not implemented | No | KM-14–17 planned |

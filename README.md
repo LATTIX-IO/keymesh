@@ -106,6 +106,28 @@ secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
 
+## KM-06: explicit provider registration and capability routing
+
+`ProviderRegistry` stores only explicitly enrolled, host-scoped providers,
+never auto-discovers hardware/KMS devices or silently downgrades HSM protection
+to software. Consumers select a named provider or **explicitly opt in** to
+`AnyCompatible` among independently authorized tenant/provider scopes. Routes
+admit exact KM-04 operations with known health, custody, version and bounds;
+Unknown fails closed. Lexicographic tie-breaking is deterministic but not a
+security recommendation.
+
+A `RoutedProvider` carries a revocable lease. Its `execute` method preserves
+KM-05's mandatory policy, exact identity/version binding and unknown commit
+semantics. Registrations may be revoked concurrently, but cannot cancel
+remote operations already sent. The host must independently validate health,
+identity, HSM claims and tenant authority; mocks are not attestations.
+
+Reference: [KM-06 provider registry](docs/specs/provider-registry-v1.md).
+
+```sh
+cargo run --locked -p keymesh --example provider_registry
+```
+
 ## KM-05: runtime-neutral async provider contract
 
 The crate now defines an object-safe `KeyProvider` trait returning boxed standard
