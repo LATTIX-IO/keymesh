@@ -252,15 +252,28 @@ fn aes_key_wrap_enforces_rfc3394_block_alignment_but_rfc5649_handles_padding() {
             O::UnwrapKey,
             key_wrap(AesWrapVariant::Rfc3394),
             P::Ciphertext { bytes: 16 }
-        ).validate(),
+        )
+        .validate(),
         Err(ProfileError::InvalidParameters)
     );
-    assert!(intent(
-        O::UnwrapKey, key_wrap(AesWrapVariant::Rfc3394), P::Ciphertext { bytes: 24 }
-    ).validate().is_ok());
-    assert!(intent(
-        O::UnwrapKey, key_wrap(AesWrapVariant::Rfc5649), P::Ciphertext { bytes: 16 }
-    ).validate().is_ok());
+    assert!(
+        intent(
+            O::UnwrapKey,
+            key_wrap(AesWrapVariant::Rfc3394),
+            P::Ciphertext { bytes: 24 }
+        )
+        .validate()
+        .is_ok()
+    );
+    assert!(
+        intent(
+            O::UnwrapKey,
+            key_wrap(AesWrapVariant::Rfc5649),
+            P::Ciphertext { bytes: 16 }
+        )
+        .validate()
+        .is_ok()
+    );
 }
 #[test]
 fn aes_aead_profile_never_guesses_nonce_or_tag_size() {
@@ -367,18 +380,15 @@ fn mlkem_exact_parameter_sets_only_allow_kem_operations() {
             intent(
                 O::Decapsulate,
                 p.clone(),
-                P::Ciphertext { bytes: variant.ciphertext_bytes() }
+                P::Ciphertext {
+                    bytes: variant.ciphertext_bytes()
+                }
             )
-                .validate()
-                .is_ok()
+            .validate()
+            .is_ok()
         );
         assert_eq!(
-            intent(
-                O::Decapsulate,
-                p.clone(),
-                P::Ciphertext { bytes: 1 }
-            )
-            .validate(),
+            intent(O::Decapsulate, p.clone(), P::Ciphertext { bytes: 1 }).validate(),
             Err(ProfileError::CiphertextLengthMismatch)
         );
         assert_eq!(
