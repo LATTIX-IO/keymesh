@@ -107,6 +107,9 @@ pub struct SoftwareLifecycleContext<'a> {
     pub action: SoftwareLifecycleAction,
     /// Exact concrete version to purge, or None for targetless Generate.
     pub reference: Option<&'a KeyRef>,
+    /// Monotonic lifecycle generation proposed by the host, if applicable.
+    /// This is compared again while holding the mutation lock after policy.
+    pub expected_generation: Option<u64>,
 }
 
 /// Mandatory host-supplied lifecycle authorization for targetless creation and
