@@ -36,5 +36,9 @@ required-features = ["software-provider"]
 name = "software_provider"
 required-features = ["software-provider"]
 
+[[test]]
+name = "software_lifecycle"
+required-features = ["software-provider"]
+
 [lints]
 workspace = true
