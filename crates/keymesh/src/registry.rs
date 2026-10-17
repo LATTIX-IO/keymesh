@@ -218,9 +218,6 @@ impl Registration {
     fn health_state(&self) -> u64 {
         self.health_epoch.load(Ordering::Acquire)
     }
-    fn health(&self) -> ProviderHealth {
-        ProviderHealth::decode((self.health_state() & 3) as u8)
-    }
     fn matches_healthy_epoch(&self, expected: u64) -> bool {
         self.is_live()
             && self.health_state() == expected
