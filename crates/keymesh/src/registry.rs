@@ -227,12 +227,16 @@ impl Registration {
         let mut previous = self.health_state();
         loop {
             let generation = previous >> 2;
-            let next_generation = generation.checked_add(1)
+            let next_generation = generation
+                .checked_add(1)
                 .filter(|number| *number <= (u64::MAX >> 2))
                 .ok_or(RegistrationError::RegistryUnavailable)?;
             let next = (next_generation << 2) | u64::from(state.encode());
             match self.health_epoch.compare_exchange_weak(
-                previous, next, Ordering::AcqRel, Ordering::Acquire
+                previous,
+                next,
+                Ordering::AcqRel,
+                Ordering::Acquire,
             ) {
                 Ok(_) => return Ok(()),
                 Err(current) => previous = current,
