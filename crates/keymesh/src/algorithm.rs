@@ -462,9 +462,17 @@ fn allowed_extension_label(label: &str) -> bool {
         && label
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
-        && !["pin", "secret", "token", "password", "credential", "signature", "apikey"]
-            .iter()
-            .any(|bad| label.to_ascii_lowercase().contains(bad))
+        && ![
+            "pin",
+            "secret",
+            "token",
+            "password",
+            "credential",
+            "signature",
+            "apikey",
+        ]
+        .iter()
+        .any(|bad| label.to_ascii_lowercase().contains(bad))
 }
 
 fn validate_extension(ext: &ExtensionProfile) -> Result<(), ProfileError> {
@@ -507,8 +515,7 @@ impl AlgorithmProfile {
                 ..
             } => {
                 if !valid_modulus(*modulus_bits)
-                    || u32::from(*modulus_bits) / 8
-                        <= 2 * u32::from(digest.output_bytes()) + 2
+                    || u32::from(*modulus_bits) / 8 <= 2 * u32::from(digest.output_bytes()) + 2
                 {
                     return Err(ProfileError::InvalidParameters);
                 }
@@ -573,7 +580,11 @@ impl OperationIntent {
         {
             return Err(ProfileError::OperationMismatch);
         }
-        if let O::Extension { namespace, identifier } = &self.operation {
+        if let O::Extension {
+            namespace,
+            identifier,
+        } = &self.operation
+        {
             if !allowed_extension_label(namespace) || !allowed_extension_label(identifier) {
                 return Err(ProfileError::InvalidExtension);
             }
@@ -585,8 +596,15 @@ impl OperationIntent {
         // Lifecycle operations are distinct capabilities. The import payload
         // is metadata only and never transported through this type.
         match &self.operation {
-            O::Generate | O::Rotate | O::Enable | O::Disable | O::ScheduleDelete | O::Recover
-            | O::Purge | O::ExportPublic | O::ExportPrivate => {
+            O::Generate
+            | O::Rotate
+            | O::Enable
+            | O::Disable
+            | O::ScheduleDelete
+            | O::Recover
+            | O::Purge
+            | O::ExportPublic
+            | O::ExportPrivate => {
                 if !matches!(self.payload, P::None) {
                     return Err(ProfileError::PayloadMismatch);
                 }
@@ -612,18 +630,35 @@ impl OperationIntent {
             return Err(ProfileError::OperationMismatch);
         }
         let allowed = match (&self.operation, &self.profile) {
-            (O::SignMessage | O::VerifyMessage, A::RsaPss { .. } | A::Ecdsa { .. }
-                | A::EdDsa { .. } | A::SlhDsa { .. }) => matches!(self.payload, P::Message { .. }),
-            (O::SignMessage | O::VerifyMessage, A::MlDsa { input: MlDsaInput::Pure
-                | MlDsaInput::HashMessage { .. }, .. }) => matches!(self.payload, P::Message { .. }),
-            (O::SignDigest { digest } | O::VerifyDigest { digest }, A::RsaPss { digest: profile, .. }
-                | A::Ecdsa { digest: profile, .. }) => {
+            (
+                O::SignMessage | O::VerifyMessage,
+                A::RsaPss { .. } | A::Ecdsa { .. } | A::EdDsa { .. } | A::SlhDsa { .. },
+            ) => matches!(self.payload, P::Message { .. }),
+            (
+                O::SignMessage | O::VerifyMessage,
+                A::MlDsa {
+                    input: MlDsaInput::Pure | MlDsaInput::HashMessage { .. },
+                    ..
+                },
+            ) => matches!(self.payload, P::Message { .. }),
+            (
+                O::SignDigest { digest } | O::VerifyDigest { digest },
+                A::RsaPss {
+                    digest: profile, ..
+                }
+                | A::Ecdsa {
+                    digest: profile, ..
+                },
+            ) => {
                 if digest != profile {
                     return Err(ProfileError::DigestMismatch);
                 }
                 match self.payload {
-                    P::Digest { algorithm, bytes } if algorithm == *digest
-                        && bytes == digest.output_bytes() => true,
+                    P::Digest { algorithm, bytes }
+                        if algorithm == *digest && bytes == digest.output_bytes() =>
+                    {
+                        true
+                    }
                     P::Digest { algorithm, .. } if algorithm != *digest => {
                         return Err(ProfileError::DigestMismatch);
                     }
@@ -631,8 +666,13 @@ impl OperationIntent {
                     _ => return Err(ProfileError::PayloadMismatch),
                 }
             }
-            (O::SignExternalMu | O::VerifyExternalMu, A::MlDsa {
-                input: MlDsaInput::ExternalMu, .. }) => {
+            (
+                O::SignExternalMu | O::VerifyExternalMu,
+                A::MlDsa {
+                    input: MlDsaInput::ExternalMu,
+                    ..
+                },
+            ) => {
                 if let P::ExternalMu { bytes } = self.payload {
                     if bytes != 64 {
                         return Err(ProfileError::DigestLengthMismatch);
@@ -646,32 +686,36 @@ impl OperationIntent {
                 O::Encrypt => matches!(self.payload, P::Message { .. }),
                 _ => matches!(self.payload, P::Ciphertext { .. }),
             },
-            (O::Encrypt | O::Decrypt | O::WrapKey | O::UnwrapKey, A::RsaOaep {
-                modulus_bits, digest, .. }) => {
-                match (&self.operation, &self.payload) {
-                    (O::Encrypt, P::Message { bytes })
-                    | (O::WrapKey, P::KeyMaterial { bytes }) => {
-                        let max = u64::from(*modulus_bits) / 8
-                            - 2 * u64::from(digest.output_bytes()) - 2;
-                        if *bytes > max {
-                            return Err(ProfileError::AlgorithmInputTooLarge);
-                        }
-                        true
+            (
+                O::Encrypt | O::Decrypt | O::WrapKey | O::UnwrapKey,
+                A::RsaOaep {
+                    modulus_bits,
+                    digest,
+                    ..
+                },
+            ) => match (&self.operation, &self.payload) {
+                (O::Encrypt, P::Message { bytes }) | (O::WrapKey, P::KeyMaterial { bytes }) => {
+                    let max =
+                        u64::from(*modulus_bits) / 8 - 2 * u64::from(digest.output_bytes()) - 2;
+                    if *bytes > max {
+                        return Err(ProfileError::AlgorithmInputTooLarge);
                     }
-                    (O::Decrypt | O::UnwrapKey, P::Ciphertext { bytes }) => {
-                        if *bytes != u64::from(*modulus_bits) / 8 {
-                            return Err(ProfileError::AlgorithmInputTooLarge);
-                        }
-                        true
-                    }
-                    _ => false,
+                    true
                 }
-            }
+                (O::Decrypt | O::UnwrapKey, P::Ciphertext { bytes }) => {
+                    if *bytes != u64::from(*modulus_bits) / 8 {
+                        return Err(ProfileError::AlgorithmInputTooLarge);
+                    }
+                    true
+                }
+                _ => false,
+            },
             (O::WrapKey | O::UnwrapKey, A::AesKeyWrap { variant, .. }) => {
                 match (&self.operation, &self.payload) {
                     (O::WrapKey, P::KeyMaterial { bytes }) => {
-                        if *bytes == 0 || matches!(variant, AesWrapVariant::Rfc3394)
-                            && (*bytes < 16 || bytes % 8 != 0)
+                        if *bytes == 0
+                            || matches!(variant, AesWrapVariant::Rfc3394)
+                                && (*bytes < 16 || bytes % 8 != 0)
                         {
                             return Err(ProfileError::InvalidParameters);
                         }
@@ -690,9 +734,15 @@ impl OperationIntent {
                 matches!(self.payload, P::Message { .. })
             }
             (O::Encapsulate, A::MlKem { .. }) => matches!(self.payload, P::None),
-            (O::Decapsulate, A::MlKem { .. }) => matches!(self.payload, P::Ciphertext { bytes } if bytes > 0),
+            (O::Decapsulate, A::MlKem { .. }) => {
+                matches!(self.payload, P::Ciphertext { bytes } if bytes > 0)
+            }
             (O::DeriveKey, A::Hkdf { digest }) => {
-                if let P::Derivation { info_bytes, output_bytes } = self.payload {
+                if let P::Derivation {
+                    info_bytes,
+                    output_bytes,
+                } = self.payload
+                {
                     if info_bytes > 65536
                         || output_bytes == 0
                         || output_bytes > 255 * u64::from(digest.output_bytes())
