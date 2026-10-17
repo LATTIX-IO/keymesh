@@ -249,8 +249,7 @@ mod tests {
 
     #[test]
     fn key_material_cannot_reactivate_erased_allocation() {
-        let mut owner = SecretBytes::from_vec(vec![0x44; 32])
-            .unwrap_or_else(|e| panic!("{e}"));
+        let mut owner = SecretBytes::from_vec(vec![0x44; 32]).unwrap_or_else(|e| panic!("{e}"));
         owner.erase();
         assert!(matches!(KeyMaterial::new(owner), Err(SecretError::Empty)));
     }
