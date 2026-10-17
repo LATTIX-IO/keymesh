@@ -734,7 +734,6 @@ fn concurrent_same_name_generation_allows_only_one_stored_key() {
     assert_eq!(successes, 1);
 }
 
-
 #[test]
 fn explicitly_enrolled_software_route_executes_real_signature_and_fails_after_revocation() {
     let f = Fixture::new();
@@ -802,10 +801,7 @@ fn explicitly_enrolled_software_route_executes_real_signature_and_fails_after_re
 fn process_local_key_is_not_recovered_by_new_same_identity_provider() {
     let f = Fixture::new();
     let created = f.create();
-    let restarted = SoftwareProvider::new(
-        f.scope.provider().clone(),
-        f.scope.namespace().clone(),
-    );
+    let restarted = SoftwareProvider::new(f.scope.provider().clone(), f.scope.namespace().clone());
     let intent = ed_intent(CryptoOperation::SignMessage, 3);
     let trace = CorrelationId::parse("km08-restart").unwrap_or_else(|e| panic!("{e}"));
     assert_predispatch(
