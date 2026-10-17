@@ -78,7 +78,10 @@ Routing captures a short, bounded snapshot of explicit registration references
 under a std RwLock. **No lock is held across an async provider read.** Each
 registration has a revocable atomic active flag (new registrations have
 distinct allocation identities, preventing stale handles from reviving after
-unregister/re-register). Routing checks the lease before and after capability
+unregister/re-register). Host health and a monotonic health revision are packed
+into one atomic value, so a route cannot survive a Healthy -> Unavailable ->
+Healthy transition (nor a health update while capability reads are awaited).
+Routing checks both lease and health revision before and after capability
 reads, and immediately before returning a selection.
 
 A `RoutedProvider` is not permanent authority. `ensure_live` fails if
