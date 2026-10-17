@@ -402,7 +402,7 @@ fn creation_does_not_accept_other_algorithms_or_lifecycle_payloads() {
 #[test]
 fn duplicate_keys_and_invalid_native_selectors_fail_closed() {
     let f = Fixture::new();
-    let created = f.create();
+    let _created = f.create();
     assert_predispatch(f.create_with(&f.policy), ProviderErrorKind::InvalidInput);
     let alias = KeyRef::new(
         f.scope.provider().clone(),
