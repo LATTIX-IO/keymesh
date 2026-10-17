@@ -58,8 +58,8 @@ pub use registry::{
     RoutingFailure,
 };
 
-pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
 pub use credential::{
     CredentialAuthorization, CredentialError, CredentialFuture, CredentialPurpose,
     CredentialRequest, CredentialSource, ScopedCredential, acquire_scoped_credential,
 };
+pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
