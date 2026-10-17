@@ -84,6 +84,9 @@ jobs:
       - name: Execute opt-in real Ed25519 software example
         run: cargo run --locked -p keymesh --features software-provider --example software_ed25519
 
+      - name: Execute version-safe rotation consumer
+        run: cargo run --locked -p keymesh --features software-provider --example software_rotation
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -145,3 +148,6 @@ jobs:
 
       - name: Execute opt-in Ed25519 software example at MSRV
         run: cargo run --locked -p keymesh --features software-provider --example software_ed25519
+
+      - name: Execute version-safe rotation consumer at MSRV
+        run: cargo run --locked -p keymesh --features software-provider --example software_rotation
