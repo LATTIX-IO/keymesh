@@ -69,7 +69,9 @@ pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
 
 #[cfg(feature = "software-provider")]
 pub use software::{
-    CreatedSoftwareKey, MAX_SOFTWARE_KEYS, MAX_SOFTWARE_MESSAGE_BYTES, SoftwareCreateRequest,
-    SoftwareLifecycleAction, SoftwareLifecycleContext, SoftwareLifecycleGate, SoftwareProvider,
-    SoftwarePurgeRequest,
+    CreatedSoftwareKey, MAX_SOFTWARE_KEYS, MAX_SOFTWARE_MESSAGE_BYTES, MAX_SOFTWARE_VERSIONS_PER_KEY,
+    SoftwareCreateRequest, SoftwareLifecycleAction, SoftwareLifecycleContext,
+    SoftwareLifecycleEvidence, SoftwareLifecycleGate, SoftwareLogicalSnapshot, SoftwareProvider,
+    SoftwarePurgeRequest, SoftwareRotateRequest, SoftwareRotation, SoftwareTransitionAction,
+    SoftwareTransitionRequest, SoftwareVersionSnapshot, SoftwareVersionState,
 };
