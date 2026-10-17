@@ -28,6 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let catalog = ProviderCapabilities {
         schema_version: CAPABILITY_SCHEMA_VERSION,
+        provider_instance: provider.as_str().to_owned(),
+        namespace: namespace.as_str().to_owned(),
         protocol_revision: "fixture.r1".into(),
         feature_revision: "fixture.v1".into(),
         reported_protection: ProtectionClass::Hsm,
@@ -53,7 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         export: ExportRequirement::None,
     };
     let host = HostValidatedCapabilities {
-        // In a real host, neither value may come from untrusted request text.
+        // In a real host, none of these values may come from untrusted
+        // provider reports or caller-provided tenant labels.
+        scope: Some(HostScope::new(provider.clone(), namespace.clone())),
         protection: Some(ProtectionClass::Hsm),
         version_model: Some(VersionModel::ProviderVersion),
         permit_extensions: false,
