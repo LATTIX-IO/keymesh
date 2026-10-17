@@ -11,7 +11,8 @@ Project website: https://lattix.io
 **Unreleased bootstrap.** Typed key identity/version, URI, crypto taxonomy,
 checked async provider operations, explicit capability-based provider routing,
 and bounded sensitive-material/credential callback contracts are implemented
-and tested using fake providers. No real cryptographic backend, live KMS/HSM,
+and tested. An explicitly opted-in ephemeral Ed25519 software provider can
+perform real local message signing. No live KMS/HSM,
 IAM system, independent assurance attestation or production credential store
 is included. Public APIs are not release-stable and the `keymesh` crate
 remains **non-publishable** until separate release approval.
@@ -109,6 +110,29 @@ The example performs no key generation, cryptographic operation, KMS request,
 secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
+
+## KM-08: opt-in pure-Ed25519 in-memory software provider
+
+Feature `software-provider` is **disabled by default** and must be
+explicitly enabled/enrolled by an independently authenticated host.
+`SoftwareProvider` performs actual Ed25519 pure-message sign/verify
+and public-key export; a distinct `SoftwareLifecycleGate` authorizes
+targetless key generation and exact-version purge before mutation.
+
+It uses the OS CSPRNG and RustCrypto, stores ephemeral keys under KM-07
+zeroizing owners and enforces KM-02/04/05 exact key version, capability,
+policy, and tenant binding. It cannot satisfy HSM/TEE requirements or
+fall back from a failed HSM to software. A process restart loses all
+in-memory key material. It offers **no** persistent KMS, cloud API,
+hardware assurance, FIPS certification, or private-key export.
+KM-05's raw-KeyMaterial/Generate/Import refusal is unchanged.
+
+```sh
+cargo run --locked -p keymesh --features software-provider --example software_ed25519
+cargo test --workspace --all-features --locked
+```
+
+See [KM-08 contract](docs/specs/software-ed25519-v1.md).
 
 ## KM-07: owned secret buffers and explicit credential callbacks
 
