@@ -127,6 +127,9 @@ fn error_types_are_redacted_and_never_echo_credentials() {
     source["feature_revision"] = json!("PRIVATE_TOKEN_DO_NOT_ECHO");
     let bad: ProviderCapabilities =
         serde_json::from_value(source).unwrap_or_else(|e| panic!("{e}"));
-    let e = bad.validate().unwrap_err();
+    let e = match bad.validate() {
+        Ok(()) => panic!("secret-like provider revision unexpectedly accepted"),
+        Err(error) => error,
+    };
     assert!(!format!("{e:?} {e}").contains("PRIVATE_TOKEN_DO_NOT_ECHO"));
 }
