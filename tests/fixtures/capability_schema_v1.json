@@ -125,5 +125,7 @@
       "support": "unknown",
       "max_input_bytes": null
     }
-  ]
+  ],
+  "provider_instance": "mock-hsm",
+  "namespace": "tenant-a"
 }
