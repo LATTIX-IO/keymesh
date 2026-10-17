@@ -109,3 +109,23 @@ All tests use synthetic placeholder credentials. They do not prove
 physical erasure of allocator/OS/device memory, credential authenticity,
 IAM authorization, HSM compliance or real cryptographic enforcement.
 Future native adapters must close those gaps independently.
+
+
+## KM-08 real Ed25519 software provider (FOSS-409)
+
+The opt-in software provider adds a real Ed25519 primitive, without
+pretending to establish hardware custody. RFC 8032 KATs (public key
+and signature) plus negative tampering/wrong-key/signature tests
+cover TM-09/INV-05 message-vs-digest confusion and signature fidelity.
+
+Host-authorized targetless creation, exact version/custody checks,
+KM-04 admission and KM-05 mandatory `PolicyGate` are exercised before
+any keyed sign/verify/export operation. Tests cover TM-01/TM-02/TM-05
+(alias/version/tenant substitutions and HSM-to-software downgrade),
+TM-14/INV-13 mandatory policy outage, and TM-15/INV-06 private export
+denial. Concurrent purge/name reuse while signing policy is pending
+cannot switch material; duplicate creation races admit one key.
+OS-CSPRNG generated private material remains under KM-07 zeroization;
+no key bytes enter logs, audit objects, serialization or PR fixtures.
+Provider registry must be explicitly enrolled; feature-off builds
+remain available. This work is not FIPS/HSM/KMS certification.
