@@ -417,3 +417,60 @@ pub trait KeyProvider: Send + Sync {
         lifecycle;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        AlgorithmProfile, ExportRequirement, MlKemVariant, PayloadDescriptor,
+        ProtectionRequirement, VersionRequirement,
+    };
+
+    fn encapsulation(variant: MlKemVariant) -> OperationIntent {
+        OperationIntent {
+            operation: CryptoOperation::Encapsulate,
+            profile: AlgorithmProfile::MlKem { variant },
+            payload: PayloadDescriptor::None,
+            binding: VersionRequirement::StableResource,
+            protection: ProtectionRequirement::Any,
+            export: ExportRequirement::None,
+        }
+    }
+
+    #[test]
+    fn kem_public_ciphertext_length_is_checked_after_possible_dispatch() {
+        let protected = ProtectedResultRef::new(
+            CorrelationId::parse("private-kem-ref").unwrap_or_else(|e| panic!("{e}")),
+        );
+        for variant in [
+            MlKemVariant::MlKem512, MlKemVariant::MlKem768, MlKemVariant::MlKem1024
+        ] {
+            let right = ProviderOutput::Encapsulation {
+                ciphertext: vec![0x77; variant.ciphertext_bytes() as usize],
+                shared_secret: protected.clone(),
+            };
+            assert!(right.matches_operation(&encapsulation(variant)));
+            let cross_variant = match variant {
+                MlKemVariant::MlKem512 => MlKemVariant::MlKem768,
+                MlKemVariant::MlKem768 => MlKemVariant::MlKem1024,
+                MlKemVariant::MlKem1024 => MlKemVariant::MlKem512,
+            };
+            assert!(!right.matches_operation(&encapsulation(cross_variant)));
+            let wrong_length = ProviderOutput::Encapsulation {
+                ciphertext: vec![0x77; 1],
+                shared_secret: protected.clone(),
+            };
+            assert!(!wrong_length.matches_operation(&encapsulation(variant)));
+        }
+    }
+
+    #[test]
+    fn ambiguous_remote_outcome_cannot_be_constructed_as_not_dispatched() {
+        let e = ProviderError::not_dispatched(ProviderErrorKind::UnknownCommitState);
+        assert_eq!(e.state(), OperationState::UnknownCommitState);
+        assert_eq!(e.retry(), RetryDisposition::ReconcileBeforeRetry);
+        let e = ProviderError::confirmed_failure(ProviderErrorKind::UnknownCommitState);
+        assert_eq!(e.state(), OperationState::UnknownCommitState);
+    }
+}
+
