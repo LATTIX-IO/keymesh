@@ -520,6 +520,21 @@ impl AlgorithmProfile {
                     return Err(ProfileError::InvalidParameters);
                 }
             }
+            Self::MlDsa {
+                variant,
+                input: MlDsaInput::HashMessage { digest },
+            } => {
+                // FIPS 204 5.4: prehash collision strength must be at least
+                // twice the classical signature security strength.
+                let min_bytes = match variant {
+                    MlDsaVariant::MlDsa44 => 32,
+                    MlDsaVariant::MlDsa65 => 48,
+                    MlDsaVariant::MlDsa87 => 64,
+                };
+                if digest.output_bytes() < min_bytes {
+                    return Err(ProfileError::InvalidParameters);
+                }
+            }
             Self::Ecdsa { .. }
             | Self::EdDsa { .. }
             | Self::Hkdf { .. }
