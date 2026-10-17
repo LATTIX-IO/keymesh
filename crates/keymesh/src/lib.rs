@@ -32,7 +32,7 @@ pub use algorithm::{
     VersionRequirement,
 };
 pub use capability::{
-    Admission, AttestationClaim, CapabilityEntry, CapabilityError, Exportability,
-    HostValidatedCapabilities, ProtectionClass, ProviderCapabilities, SupportStatus,
-    VersionModel, CAPABILITY_SCHEMA_VERSION, MAX_CAPABILITY_ENTRIES,
+    Admission, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CapabilityError,
+    Exportability, HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, ProtectionClass,
+    ProviderCapabilities, SupportStatus, VersionModel,
 };
