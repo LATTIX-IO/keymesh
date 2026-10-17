@@ -415,6 +415,28 @@ fn mldsa_pure_hash_and_external_mu_are_distinct_typed_inputs() {
     );
 }
 #[test]
+fn hash_mldsa_prehash_strength_matches_variant_security_category() {
+    let cases = [
+        (MlDsaVariant::MlDsa44, D::Sha256, true),
+        (MlDsaVariant::MlDsa65, D::Sha256, false),
+        (MlDsaVariant::MlDsa65, D::Sha384, true),
+        (MlDsaVariant::MlDsa87, D::Sha384, false),
+        (MlDsaVariant::MlDsa87, D::Sha512, true),
+    ];
+    for (variant, digest, acceptable) in cases {
+        let p = A::MlDsa {
+            variant,
+            input: MlDsaInput::HashMessage { digest },
+        };
+        assert_eq!(
+            p.validate().is_ok(),
+            acceptable,
+            "HashML-DSA profile prehash collision bound incorrect"
+        );
+    }
+}
+
+#[test]
 fn slhdsa_parameter_sets_remain_signature_specific() {
     for variant in [SlhDsaVariant::Sha2_128s, SlhDsaVariant::Shake256f] {
         let p = A::SlhDsa { variant };
