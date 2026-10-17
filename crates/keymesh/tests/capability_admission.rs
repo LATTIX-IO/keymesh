@@ -386,3 +386,24 @@ fn cross_provider_and_cross_tenant_assurance_evidence_must_fail_closed() {
         Err(CapabilityError::ScopeMismatch)
     );
 }
+
+#[test]
+fn hkdf_capability_input_limit_counts_info_only_not_derived_output() {
+    let mut c = catalog();
+    c.entries.push(capability(
+        O::DeriveKey,
+        A::Hkdf { digest: D::Sha256 },
+        SupportStatus::Supported,
+        Some(10),
+    ));
+    let mut req = request();
+    req.operation = O::DeriveKey;
+    req.profile = A::Hkdf { digest: D::Sha256 };
+    req.payload = P::Derivation { info_bytes: 10, output_bytes: 64 };
+    assert!(c.admit(&req, &host()).is_ok());
+    req.payload = P::Derivation { info_bytes: 11, output_bytes: 64 };
+    assert_eq!(
+        c.admit(&req, &host()),
+        Err(CapabilityError::PayloadTooLarge)
+    );
+}
