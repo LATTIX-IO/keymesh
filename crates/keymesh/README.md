@@ -21,3 +21,9 @@ requirements.
 ## License
 
 Licensed under either Apache-2.0 or MIT, at your option.
+
+KM-09 extends the optional software provider with immutable Ed25519
+versions, CAS-controlled rotation, Enable/Disable/ScheduleDelete and
+host-policy-authorized exact-version purge, plus historical verification.
+All in-memory keys are lost at process restart. See the
+[KM-09 lifecycle contract](../../docs/specs/software-lifecycle-v1.md).
