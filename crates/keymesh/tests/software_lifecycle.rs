@@ -226,7 +226,7 @@ fn rotation_changes_active_pointer_preserves_prior_verification_without_reusing_
     rejected(f.signature(old.reference(), b"new unauthorized signature"),
         ProviderErrorKind::AuthorizationDenied);
     let fresh = f.signature(receipt.created().reference(), b"new signed event")
-        .unwrap_or_else(|e| panic!("{e}");
+        .unwrap_or_else(|e| panic!("{e}"));
     assert!(f.verified(receipt.created().reference(), b"new signed event", &fresh)
         .unwrap_or_else(|e| panic!("{e}")));
 }
