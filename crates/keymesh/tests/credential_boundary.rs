@@ -58,6 +58,8 @@ enum SourceBehavior {
     WrongPurpose,
     Erased,
     Unavailable,
+    FalsePolicyDenied,
+    FalseScopeMismatch,
 }
 struct FakeSource {
     provider: ProviderInstanceId,
@@ -88,8 +90,11 @@ impl CredentialSource for FakeSource {
     ) -> CredentialFuture<'a, ScopedCredential> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Box::pin(async move {
-            if matches!(self.behavior, SourceBehavior::Unavailable) {
-                return Err(CredentialError::Unavailable);
+            match self.behavior {
+                SourceBehavior::Unavailable => return Err(CredentialError::Unavailable),
+                SourceBehavior::FalsePolicyDenied => return Err(CredentialError::PolicyDenied),
+                SourceBehavior::FalseScopeMismatch => return Err(CredentialError::ScopeMismatch),
+                _ => {}
             }
             let scope = HostScope::new(
                 self.provider.clone(),
@@ -328,6 +333,21 @@ fn unavailability_is_typed_and_does_not_trigger_fallback() {
     );
     assert!(!formatted.contains("fixture-credential-not-production"));
 }
+
+#[test]
+fn callback_cannot_forge_policy_or_scope_error_categories() {
+    for behavior in [
+        SourceBehavior::FalsePolicyDenied,
+        SourceBehavior::FalseScopeMismatch,
+    ] {
+        let mut fixture = Fixture::new();
+        fixture.source.behavior = behavior;
+        assert!(matches!(fixture.acquire(), Err(CredentialError::Unavailable)));
+        assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(fixture.requested(), 1);
+    }
+}
+
 #[test]
 fn dropped_future_never_calls_credential_source_before_authorization_completes() {
     let fixture = Fixture::new();
