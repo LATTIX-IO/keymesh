@@ -129,6 +129,32 @@ impl KeyProvider for SpyProvider {
             }
         })
     }
+
+    fn lifecycle<'a>(
+        &'a self,
+        prepared: &'a PreparedDispatch<'_>,
+        _payload: &'a OperationInput<'_>,
+    ) -> ProviderFuture<'a, ProviderReply> {
+        self.dispatches.fetch_add(1, Ordering::SeqCst);
+        let scenario = self.scenario;
+        let target = prepared.target().clone();
+        Box::pin(async move {
+            match scenario {
+                Scenario::UnknownCommit => Err(ProviderError::unknown_commit_state()),
+                Scenario::ConfirmedRejection => Err(ProviderError::confirmed_failure(
+                    ProviderErrorKind::ProviderRejected,
+                )),
+                Scenario::PendingAfterDispatch => {
+                    std::future::pending::<Result<ProviderReply, ProviderError>>().await
+                }
+                _ => Ok(ProviderReply::new(
+                    target,
+                    ProviderOutput::Acknowledged,
+                    None,
+                )),
+            }
+        })
+    }
 }
 #[derive(Clone, Copy)]
 enum GateMode {
@@ -600,4 +626,56 @@ fn malformed_digest_proof_and_forbidden_signature_on_signing_are_rejected() {
         ProviderErrorKind::InvalidInput,
     );
     assert_eq!(t.queried(), 0);
+}
+
+#[test]
+fn lost_ack_for_destructive_rotate_requires_reconciliation_not_automatic_retry() {
+    let mut t = Fixture::new();
+    let op = CryptoOperation::Rotate;
+    t.intent.operation = op.clone();
+    t.intent.payload = PayloadDescriptor::None;
+    t.provider.catalog.entries[0].operation = op;
+    t.provider.catalog.entries[0].max_input_bytes = Some(0);
+    t.provider.scenario = Scenario::UnknownCommit;
+    match t.run_with(OperationInput::None) {
+        Err(e) => {
+            assert_eq!(e.state(), OperationState::UnknownCommitState);
+            assert_eq!(e.retry(), RetryDisposition::ReconcileBeforeRetry);
+        }
+        Ok(_) => panic!("lost lifecycle acknowledgement was treated as success"),
+    }
+    assert_eq!(t.dispatched(), 1);
+}
+
+#[test]
+fn destructive_mutations_never_dispatch_to_unpinned_active_aliases() {
+    for operation in [CryptoOperation::Rotate, CryptoOperation::Purge, CryptoOperation::ScheduleDelete] {
+        let mut t = Fixture::new();
+        t.intent.operation = operation;
+        t.intent.payload = PayloadDescriptor::None;
+        t.reference = KeyRef::new(
+            instance("mock-hsm"), namespace("tenant-a"), logical("payments"),
+            KeySelector::Active,
+        );
+        assert_pre_dispatch(t.run_with(OperationInput::None), ProviderErrorKind::InvalidInput);
+        assert_eq!(t.dispatched(), 0);
+        assert_eq!(t.queried(), 0);
+    }
+}
+
+#[test]
+fn key_material_operations_are_not_allowed_without_a_sensitive_input_boundary() {
+    let mut t = Fixture::new();
+    t.intent.operation = CryptoOperation::WrapKey;
+    t.intent.profile = AlgorithmProfile::RsaOaep {
+        modulus_bits: 2048, digest: DigestAlgorithm::Sha256,
+        mgf1_digest: DigestAlgorithm::Sha256,
+    };
+    t.intent.payload = PayloadDescriptor::KeyMaterial { bytes: 32 };
+    t.provider.catalog.entries[0].operation = CryptoOperation::WrapKey;
+    t.provider.catalog.entries[0].profile = t.intent.profile.clone();
+    let secret = [0xAB; 32];
+    assert_pre_dispatch(t.run_with(OperationInput::KeyMaterial(&secret)),
+        ProviderErrorKind::UnsupportedOperationOrProfile);
+    assert_eq!(t.dispatched(), 0);
 }
