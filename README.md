@@ -106,6 +106,38 @@ secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
 
+## KM-05: runtime-neutral async provider contract
+
+The crate now defines an object-safe `KeyProvider` trait returning boxed standard
+Rust futures with required read-only capability/resolve methods and explicit
+optional sign/verify/encrypt/decrypt/wrap/unwrap/MAC/KEM/derive/lifecycle
+methods. Every optional method defaults to fail-closed Unsupported.
+`execute_checked` is the central no-fallback gateway: host provider/tenant
+binding, actual input-shape validation, exact KM-04 capability admission,
+concrete KM-02 key/version preflight, mandatory host-policy callback, then
+**one** operation dispatch.
+
+The result contains concrete operation identity, exact resolved target,
+binding assurance, sanitized correlation/receipt IDs, and confirmed success.
+Errors distinguish NotDispatched, ConfirmedFailure and UnknownCommitState,
+with conservative retry guidance. Provider claims are **not** independent HSM
+attestations and cancellation of a local future does not cancel a remote
+operation. No real provider backend, runtime, credential broker, key
+import/export, or crypto execution is shipped.
+
+Production sensitive material wrappers (KM-07), explicit real-provider
+inputs (including AES-GCM nonces/AAD/tag), targetless key generation,
+native provider adapters, and mutation reconciliation remain out of scope.
+The crate remains `publish = false`.
+
+Reference: [KM-05 design contract](docs/specs/provider-contract-v1.md).
+Execute the deterministic fake-provider example:
+
+```sh
+cargo run --locked -p keymesh --example provider_contract
+cargo test --workspace --all-features --locked
+```
+
 ## Crates
 
 - keymesh
