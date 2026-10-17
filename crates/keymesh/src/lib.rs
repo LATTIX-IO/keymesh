@@ -10,8 +10,8 @@
 mod algorithm;
 mod binding;
 mod capability;
-mod identity;
 mod execution;
+mod identity;
 mod provider;
 mod uri;
 
@@ -39,12 +39,12 @@ pub use capability::{
     ProviderCapabilities, SupportStatus, VersionModel,
 };
 
+pub use execution::{
+    OperationCompletion, OperationEvidence, OperationInput, OperationRequest, PolicyContext,
+    PolicyGate, PolicyVerdict, execute_checked,
+};
 pub use provider::{
     CorrelationId, KeyProvider, OperationState, PreparedDispatch, ProtectedResultRef,
     ProviderError, ProviderErrorKind, ProviderFuture, ProviderOutput, ProviderReply,
     RetryDisposition,
-};
-pub use execution::{
-    OperationCompletion, OperationEvidence, OperationInput, OperationRequest, PolicyContext,
-    PolicyGate, PolicyVerdict, execute_checked,
 };
