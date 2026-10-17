@@ -140,7 +140,12 @@ impl ScopedCredential {
         purpose: CredentialPurpose,
         secret: SecretBytes,
     ) -> Self {
-        Self { scope, operation, purpose, secret }
+        Self {
+            scope,
+            operation,
+            purpose,
+            secret,
+        }
     }
 
     /// Host-authorized provider/namespace claim; not standalone proof.
