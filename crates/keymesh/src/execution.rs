@@ -318,6 +318,14 @@ pub async fn execute_checked(
             ProviderErrorKind::UnsupportedOperationOrProfile,
         ));
     }
+    // Sensitive input ownership/zeroization is not implemented in KM-05.
+    // Returning Unsupported is safer than exposing private input to a future
+    // adapter through an unprotected, borrowed byte slice.
+    if matches!(&request.input, OperationInput::KeyMaterial(_)) {
+        return Err(ProviderError::not_dispatched(
+            ProviderErrorKind::UnsupportedOperationOrProfile,
+        ));
+    }
     if is_destructive(&request.intent.operation)
         && matches!(
             request.reference.selector(),
