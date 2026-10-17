@@ -489,7 +489,9 @@ fn neither_digest_signing_nor_other_algorithm_is_implicitly_mapped() {
         ProviderErrorKind::InvalidInput,
     );
     let mut wrong = ed_intent(CryptoOperation::SignMessage, 3);
-    wrong.profile = AlgorithmProfile::EdDsa { variant: EdDsaVariant::Ed448 };
+    wrong.profile = AlgorithmProfile::EdDsa {
+        variant: EdDsaVariant::Ed448,
+    };
     assert_predispatch(
         f.execute(
             created.reference(),
