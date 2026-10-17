@@ -16,6 +16,13 @@ scope and protection/version claims. KM-05/06 adapters MUST run
 the `Admission` result into proof of verified custody, actual material
 revision, HSM certification, or successful signature.
 
+Each catalog now includes explicit provider-instance and namespace identity.
+The independent `HostValidatedCapabilities.scope` MUST refer to the same
+authenticated provider and tenant/partition. Unknown scope or cross-provider
+and cross-tenant substitution fails closed before any capability match.
+The intersection function refuses catalogs from different scopes so its
+result cannot launder stronger hardware/version claims between providers.
+
 A provider claim alone can never satisfy a HSM/TEE or selectable-version
 requirement. Unknown or unreported support, unreported positive payload
 bounds, conflicting entries, and unknown export constraints fail closed.
