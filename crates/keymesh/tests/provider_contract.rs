@@ -1,19 +1,19 @@
 //! KM-05 fake-provider integration harness. No cryptography or network calls.
 use keymesh::{
-    AlgorithmProfile, CapabilityEntry, CorrelationId, CryptoOperation, DigestAlgorithm,
-    DispatchTarget, ExportRequirement, Exportability, HostScope, HostValidatedCapabilities,
-    KeyProvider, KeyRef, KeySelector, LogicalKeyId, OperationCompletion, OperationInput,
-    OperationIntent, OperationRequest, OperationState, PayloadDescriptor, PolicyContext,
-    PolicyGate, PolicyVerdict, PreparedDispatch, ProtectionClass, ProtectionRequirement,
-    ProviderCapabilities, ProviderError, ProviderErrorKind, ProviderFuture, ProviderInstanceId,
-    ProviderNamespace, ProviderOutput, ProviderReply, ProviderResourceId, ProviderVersionId,
-    RequiredAssurance, ResolvedKey, RetryDisposition, SupportStatus, VersionModel,
-    VersionRequirement, CAPABILITY_SCHEMA_VERSION, execute_checked,
+    AlgorithmProfile, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CorrelationId, CryptoOperation,
+    DigestAlgorithm, DispatchTarget, ExportRequirement, Exportability, HostScope,
+    HostValidatedCapabilities, KeyProvider, KeyRef, KeySelector, LogicalKeyId, OperationCompletion,
+    OperationInput, OperationIntent, OperationRequest, OperationState, PayloadDescriptor,
+    PolicyContext, PolicyGate, PolicyVerdict, PreparedDispatch, ProtectionClass,
+    ProtectionRequirement, ProviderCapabilities, ProviderError, ProviderErrorKind, ProviderFuture,
+    ProviderInstanceId, ProviderNamespace, ProviderOutput, ProviderReply, ProviderResourceId,
+    ProviderVersionId, RequiredAssurance, ResolvedKey, RetryDisposition, SupportStatus,
+    VersionModel, VersionRequirement, execute_checked,
 };
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Context, Poll, Wake, Waker};
 
 struct NoopWake;
@@ -68,7 +68,9 @@ struct SpyProvider {
     dispatches: Arc<AtomicUsize>,
 }
 impl KeyProvider for SpyProvider {
-    fn instance(&self) -> &ProviderInstanceId { &self.id }
+    fn instance(&self) -> &ProviderInstanceId {
+        &self.id
+    }
     fn capabilities<'a>(
         &'a self,
         _scope: &'a HostScope,
@@ -96,7 +98,9 @@ impl KeyProvider for SpyProvider {
         } if bytes.len() == 32);
         if !valid_form {
             return Box::pin(async {
-                Err(ProviderError::not_dispatched(ProviderErrorKind::InvalidInput))
+                Err(ProviderError::not_dispatched(
+                    ProviderErrorKind::InvalidInput,
+                ))
             });
         }
         if req.feature_revision() != "fixture.r1" {
@@ -131,18 +135,24 @@ impl KeyProvider for SpyProvider {
     }
 }
 #[derive(Clone, Copy)]
-enum GateMode { Permit, Deny, Indeterminate, Error }
+enum GateMode {
+    Permit,
+    Deny,
+    Indeterminate,
+    Error,
+}
 struct FakeGate {
     mode: GateMode,
     calls: AtomicUsize,
 }
 impl PolicyGate for FakeGate {
-    fn evaluate<'a>(&'a self, context: &'a PolicyContext<'_>)
-        -> ProviderFuture<'a, PolicyVerdict>
-    {
+    fn evaluate<'a>(&'a self, context: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyVerdict> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         assert_eq!(context.scope.provider(), context.reference.provider());
-        assert_eq!(context.catalog.provider_instance, context.scope.provider().as_str());
+        assert_eq!(
+            context.catalog.provider_instance,
+            context.scope.provider().as_str()
+        );
         let mode = self.mode;
         Box::pin(async move {
             match mode {
@@ -174,10 +184,14 @@ impl Fixture {
         let native = resource("mock:payments:42");
         let revision = version("v7");
         let profile = AlgorithmProfile::RsaPss {
-            modulus_bits: 3072, digest: DigestAlgorithm::Sha256,
-            mgf1_digest: DigestAlgorithm::Sha256, salt_bytes: 32,
+            modulus_bits: 3072,
+            digest: DigestAlgorithm::Sha256,
+            mgf1_digest: DigestAlgorithm::Sha256,
+            salt_bytes: 32,
         };
-        let operation = CryptoOperation::SignDigest { digest: DigestAlgorithm::Sha256 };
+        let operation = CryptoOperation::SignDigest {
+            digest: DigestAlgorithm::Sha256,
+        };
         let scope = HostScope::new(id.clone(), ns.clone());
         let catalog = ProviderCapabilities {
             schema_version: CAPABILITY_SCHEMA_VERSION,
@@ -197,24 +211,36 @@ impl Fixture {
             }],
         };
         let reference = KeyRef::new(
-            id.clone(), ns.clone(), key.clone(),
+            id.clone(),
+            ns.clone(),
+            key.clone(),
             KeySelector::ExactProviderVersion {
-                resource: native.clone(), version: revision.clone(),
+                resource: native.clone(),
+                version: revision.clone(),
             },
         );
         let resolved = ResolvedKey::new(
-            id.clone(), ns.clone(), key,
+            id.clone(),
+            ns.clone(),
+            key,
             DispatchTarget::ProviderVersion {
-                resource: native, version: revision,
+                resource: native,
+                version: revision,
             },
         );
         Self {
             provider: SpyProvider {
-                id, catalog, resolved, scenario: Scenario::Success,
+                id,
+                catalog,
+                resolved,
+                scenario: Scenario::Success,
                 reads: Arc::new(AtomicUsize::new(0)),
                 dispatches: Arc::new(AtomicUsize::new(0)),
             },
-            policy: FakeGate { mode: GateMode::Permit, calls: AtomicUsize::new(0) },
+            policy: FakeGate {
+                mode: GateMode::Permit,
+                calls: AtomicUsize::new(0),
+            },
             scope: scope.clone(),
             reference,
             trusted: HostValidatedCapabilities {
@@ -228,7 +254,8 @@ impl Fixture {
                 operation,
                 profile,
                 payload: PayloadDescriptor::Digest {
-                    algorithm: DigestAlgorithm::Sha256, bytes: 32,
+                    algorithm: DigestAlgorithm::Sha256,
+                    bytes: 32,
                 },
                 binding: VersionRequirement::ProviderVersion,
                 protection: ProtectionRequirement::Hsm,
@@ -241,14 +268,14 @@ impl Fixture {
     fn run(&self) -> Result<OperationCompletion, ProviderError> {
         self.run_with(OperationInput::Digest {
             algorithm: DigestAlgorithm::Sha256,
-            bytes: &self.message, authenticator: None,
+            bytes: &self.message,
+            authenticator: None,
         })
     }
-    fn run_with(&self, input: OperationInput<'_>)
-        -> Result<OperationCompletion, ProviderError>
-    {
+    fn run_with(&self, input: OperationInput<'_>) -> Result<OperationCompletion, ProviderError> {
         block_on(execute_checked(
-            &self.provider, &self.policy,
+            &self.provider,
+            &self.policy,
             OperationRequest {
                 scope: &self.scope,
                 reference: &self.reference,
@@ -286,9 +313,18 @@ fn validated_digest_dispatch_reports_exact_scope_key_version_and_confirmation() 
     assert_eq!(completion.evidence.provider, instance("mock-hsm"));
     assert_eq!(completion.evidence.namespace, namespace("tenant-a"));
     assert_eq!(completion.evidence.logical_key, logical("payments"));
-    assert_eq!(completion.evidence.target.provider_version(), Some(&version("v7")));
-    assert_eq!(completion.evidence.assurance, keymesh::BindingAssurance::ProviderVersionBound);
-    assert_eq!(completion.evidence.outcome, OperationState::ConfirmedSuccess);
+    assert_eq!(
+        completion.evidence.target.provider_version(),
+        Some(&version("v7"))
+    );
+    assert_eq!(
+        completion.evidence.assurance,
+        keymesh::BindingAssurance::ProviderVersionBound
+    );
+    assert_eq!(
+        completion.evidence.outcome,
+        OperationState::ConfirmedSuccess
+    );
     assert_eq!(completion.evidence.correlation.as_str(), "trace-704");
     assert!(matches!(completion.output, ProviderOutput::Signature(_)));
 }
@@ -308,18 +344,25 @@ fn mismatched_tenant_or_provider_is_rejected_before_any_provider_query() {
 fn payload_mismatch_and_digest_length_fail_before_query_or_dispatch() {
     let t = Fixture::new();
     assert_pre_dispatch(
-        t.run_with(OperationInput::Message { bytes: &t.message, authenticator: None }),
-        ProviderErrorKind::InvalidInput,
-    );
-    assert_pre_dispatch(
-        t.run_with(OperationInput::Digest {
-            algorithm: DigestAlgorithm::Sha256, bytes: &t.message[0..31], authenticator: None,
+        t.run_with(OperationInput::Message {
+            bytes: &t.message,
+            authenticator: None,
         }),
         ProviderErrorKind::InvalidInput,
     );
     assert_pre_dispatch(
         t.run_with(OperationInput::Digest {
-            algorithm: DigestAlgorithm::Sha3_256, bytes: &t.message, authenticator: None,
+            algorithm: DigestAlgorithm::Sha256,
+            bytes: &t.message[0..31],
+            authenticator: None,
+        }),
+        ProviderErrorKind::InvalidInput,
+    );
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Digest {
+            algorithm: DigestAlgorithm::Sha3_256,
+            bytes: &t.message,
+            authenticator: None,
         }),
         ProviderErrorKind::InvalidInput,
     );
@@ -364,18 +407,24 @@ fn catalog_provider_or_namespace_swap_is_not_dispatched() {
 fn stale_exact_version_or_rebound_resource_is_not_dispatched() {
     let mut t = Fixture::new();
     t.provider.resolved = ResolvedKey::new(
-        instance("mock-hsm"), namespace("tenant-a"), logical("payments"),
+        instance("mock-hsm"),
+        namespace("tenant-a"),
+        logical("payments"),
         DispatchTarget::ProviderVersion {
-            resource: resource("mock:payments:42"), version: version("v6"),
+            resource: resource("mock:payments:42"),
+            version: version("v6"),
         },
     );
     assert_pre_dispatch(t.run(), ProviderErrorKind::UnsupportedVersionAssurance);
     assert_eq!(t.dispatched(), 0);
     let mut t = Fixture::new();
     t.provider.resolved = ResolvedKey::new(
-        instance("mock-hsm"), namespace("tenant-a"), logical("payments"),
+        instance("mock-hsm"),
+        namespace("tenant-a"),
+        logical("payments"),
         DispatchTarget::ProviderVersion {
-            resource: resource("mock:wrong:42"), version: version("v7"),
+            resource: resource("mock:wrong:42"),
+            version: version("v7"),
         },
     );
     assert_pre_dispatch(t.run(), ProviderErrorKind::ScopeMismatch);
@@ -439,12 +488,17 @@ fn substituted_target_or_wrong_response_kind_after_dispatch_is_unknown_commit() 
 fn future_dropped_before_first_poll_cannot_dispatch() {
     let t = Fixture::new();
     let future = execute_checked(
-        &t.provider, &t.policy,
+        &t.provider,
+        &t.policy,
         OperationRequest {
-            scope: &t.scope, reference: &t.reference, host_assurance: &t.trusted,
+            scope: &t.scope,
+            reference: &t.reference,
+            host_assurance: &t.trusted,
             intent: &t.intent,
             input: OperationInput::Digest {
-                algorithm: DigestAlgorithm::Sha256, bytes: &t.message, authenticator: None,
+                algorithm: DigestAlgorithm::Sha256,
+                bytes: &t.message,
+                authenticator: None,
             },
             correlation: &t.corr,
         },
@@ -458,12 +512,17 @@ fn dropping_pending_future_after_dispatch_does_not_confirm_cancellation() {
     let mut t = Fixture::new();
     t.provider.scenario = Scenario::PendingAfterDispatch;
     let future = execute_checked(
-        &t.provider, &t.policy,
+        &t.provider,
+        &t.policy,
         OperationRequest {
-            scope: &t.scope, reference: &t.reference, host_assurance: &t.trusted,
+            scope: &t.scope,
+            reference: &t.reference,
+            host_assurance: &t.trusted,
             intent: &t.intent,
             input: OperationInput::Digest {
-                algorithm: DigestAlgorithm::Sha256, bytes: &t.message, authenticator: None,
+                algorithm: DigestAlgorithm::Sha256,
+                bytes: &t.message,
+                authenticator: None,
             },
             correlation: &t.corr,
         },
@@ -471,7 +530,10 @@ fn dropping_pending_future_after_dispatch_does_not_confirm_cancellation() {
     let mut future = Box::pin(future);
     let waker = Waker::from(Arc::new(NoopWake));
     let mut cx = Context::from_waker(&waker);
-    assert!(matches!(Pin::as_mut(&mut future).poll(&mut cx), Poll::Pending));
+    assert!(matches!(
+        Pin::as_mut(&mut future).poll(&mut cx),
+        Poll::Pending
+    ));
     assert_eq!(t.dispatched(), 1);
     drop(future);
     // No success, failure or rollback is inferred from a local dropped future.
@@ -500,8 +562,13 @@ fn simultaneous_requests_keep_scope_and_evidence_isolated() {
 fn serialized_errors_outputs_and_correlation_are_redacted() {
     let correlation = correlation("PRIVATEKEY123");
     assert!(!format!("{correlation:?}").contains("PRIVATEKEY123"));
-    assert!(!format!("{:?}", ProviderOutput::Signature(b"SECRET-PAYLOAD".to_vec()))
-        .contains("SECRET-PAYLOAD"));
+    assert!(
+        !format!(
+            "{:?}",
+            ProviderOutput::Signature(b"SECRET-PAYLOAD".to_vec())
+        )
+        .contains("SECRET-PAYLOAD")
+    );
     let e = ProviderError::unknown_commit_state();
     assert!(!format!("{e:?} {e}").contains("SECRET-PAYLOAD"));
     let outcome = Fixture::new().run().unwrap_or_else(|e| panic!("{e}"));
@@ -510,12 +577,15 @@ fn serialized_errors_outputs_and_correlation_are_redacted() {
 #[test]
 fn unsupported_optional_provider_method_is_not_implicitly_fallbacked() {
     let mut t = Fixture::new();
-    let op = CryptoOperation::VerifyDigest { digest: DigestAlgorithm::Sha256 };
+    let op = CryptoOperation::VerifyDigest {
+        digest: DigestAlgorithm::Sha256,
+    };
     t.intent.operation = op.clone();
     t.provider.catalog.entries[0].operation = op;
     let signed = [0x05u8; 64];
     let result = t.run_with(OperationInput::Digest {
-        algorithm: DigestAlgorithm::Sha256, bytes: &t.message,
+        algorithm: DigestAlgorithm::Sha256,
+        bytes: &t.message,
         authenticator: Some(&signed),
     });
     assert_pre_dispatch(result, ProviderErrorKind::UnsupportedOperationOrProfile);
@@ -525,9 +595,13 @@ fn unsupported_optional_provider_method_is_not_implicitly_fallbacked() {
 fn malformed_digest_proof_and_forbidden_signature_on_signing_are_rejected() {
     let t = Fixture::new();
     let data = [1u8; 4];
-    assert_pre_dispatch(t.run_with(OperationInput::Digest {
-        algorithm: DigestAlgorithm::Sha256, bytes: &t.message,
-        authenticator: Some(&data),
-    }), ProviderErrorKind::InvalidInput);
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Digest {
+            algorithm: DigestAlgorithm::Sha256,
+            bytes: &t.message,
+            authenticator: Some(&data),
+        }),
+        ProviderErrorKind::InvalidInput,
+    );
     assert_eq!(t.queried(), 0);
 }
