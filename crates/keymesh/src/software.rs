@@ -148,6 +148,7 @@ pub struct SoftwarePurgeRequest<'a> {
 pub struct CreatedSoftwareKey {
     reference: KeyRef,
     public_key: [u8; 32],
+    generation: u64,
 }
 impl CreatedSoftwareKey {
     /// Exact scope-qualified key reference; no mutable alias or session handle.
@@ -157,6 +158,10 @@ impl CreatedSoftwareKey {
     /// RFC 8032 Ed25519 public-key bytes (not private seed bytes).
     pub fn public_key(&self) -> &[u8; 32] {
         &self.public_key
+    }
+    /// Monotonic host-visible lifecycle revision assigned at key creation.
+    pub fn generation(&self) -> u64 {
+        self.generation
     }
 }
 impl fmt::Debug for CreatedSoftwareKey {
