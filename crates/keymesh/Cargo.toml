@@ -28,5 +28,13 @@ software-provider = ["dep:ed25519-dalek", "dep:getrandom"]
 [dev-dependencies]
 serde_json = "=1.0.145"
 
+[[example]]
+name = "software_ed25519"
+required-features = ["software-provider"]
+
+[[test]]
+name = "software_provider"
+required-features = ["software-provider"]
+
 [lints]
 workspace = true
