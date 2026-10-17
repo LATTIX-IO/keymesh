@@ -69,6 +69,9 @@ jobs:
       - name: Execute capability admission example
         run: cargo run --locked -p keymesh --example capability_admission
 
+      - name: Execute provider contract example
+        run: cargo run --locked -p keymesh --example provider_contract
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -115,3 +118,6 @@ jobs:
 
       - name: Execute capability admission example at MSRV
         run: cargo run --locked -p keymesh --example capability_admission
+
+      - name: Execute provider contract example at MSRV
+        run: cargo run --locked -p keymesh --example provider_contract

@@ -10,7 +10,9 @@
 mod algorithm;
 mod binding;
 mod capability;
+mod execution;
 mod identity;
+mod provider;
 mod uri;
 
 pub use binding::{
@@ -35,4 +37,14 @@ pub use capability::{
     Admission, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CapabilityError,
     Exportability, HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, ProtectionClass,
     ProviderCapabilities, SupportStatus, VersionModel,
+};
+
+pub use execution::{
+    MAX_VERIFICATION_PROOF_BYTES, OperationCompletion, OperationEvidence, OperationInput,
+    OperationRequest, PolicyContext, PolicyGate, PolicyVerdict, execute_checked,
+};
+pub use provider::{
+    CorrelationId, KeyProvider, OperationState, PreparedDispatch, ProtectedResultRef,
+    ProviderError, ProviderErrorKind, ProviderFuture, ProviderOutput, ProviderReply,
+    RetryDisposition,
 };
