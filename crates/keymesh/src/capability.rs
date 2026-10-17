@@ -227,14 +227,11 @@ impl std::error::Error for CapabilityError {}
 fn revision_safe(s: &str) -> bool {
     !s.is_empty()
         && s.len() <= 96
-        && s
-            .bytes()
+        && s.bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b':'))
 }
 fn claim_safe(claim: &AttestationClaim) -> bool {
-    revision_safe(&claim.kind)
-        && revision_safe(&claim.source)
-        && revision_safe(&claim.reference)
+    revision_safe(&claim.kind) && revision_safe(&claim.source) && revision_safe(&claim.reference)
 }
 
 /// Capability schema checks; provider claims remain untrusted after this.
@@ -246,7 +243,10 @@ impl ProviderCapabilities {
             || !revision_safe(&self.feature_revision)
             || self.entries.len() > MAX_CAPABILITY_ENTRIES
             || self.attestation_claims.len() > 8
-            || self.attestation_claims.iter().any(|claim| !claim_safe(claim))
+            || self
+                .attestation_claims
+                .iter()
+                .any(|claim| !claim_safe(claim))
         {
             return Err(CapabilityError::InvalidCatalog);
         }
@@ -287,7 +287,10 @@ impl ProviderCapabilities {
             }
         }
         if !self.reported_version_model.supports(intent.binding)
-            || !host.version_model.unwrap_or(VersionModel::Unknown).supports(intent.binding)
+            || !host
+                .version_model
+                .unwrap_or(VersionModel::Unknown)
+                .supports(intent.binding)
         {
             return Err(CapabilityError::UnverifiedVersion);
         }
@@ -366,8 +369,12 @@ impl ProviderCapabilities {
             let key = (left.operation.clone(), left.profile.clone());
             if let Some(rhs) = right.get(&key) {
                 let max_input_bytes = match (left.max_input_bytes, rhs.max_input_bytes) {
-                    (Some(a), Some(b)) if left.support == SupportStatus::Supported
-                        && rhs.support == SupportStatus::Supported => Some(a.min(b)),
+                    (Some(a), Some(b))
+                        if left.support == SupportStatus::Supported
+                            && rhs.support == SupportStatus::Supported =>
+                    {
+                        Some(a.min(b))
+                    }
                     _ => None,
                 };
                 common.insert(
