@@ -149,7 +149,6 @@ impl fmt::Debug for SecretBytes {
 /// let key = KeyMaterial::from_vec(vec![0x42; 32]).unwrap();
 /// let _input = OperationInput::KeyMaterial(&key);
 /// ```
-
 #[must_use = "key material remains sensitive until erased"]
 pub struct KeyMaterial(SecretBytes);
 impl KeyMaterial {
