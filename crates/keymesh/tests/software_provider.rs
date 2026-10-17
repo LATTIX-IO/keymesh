@@ -733,3 +733,98 @@ fn concurrent_same_name_generation_allows_only_one_stored_key() {
         .count();
     assert_eq!(successes, 1);
 }
+
+
+#[test]
+fn explicitly_enrolled_software_route_executes_real_signature_and_fails_after_revocation() {
+    let f = Fixture::new();
+    let created = f.create();
+    let registry = ProviderRegistry::new();
+    registry
+        .register(
+            Arc::clone(&f.provider),
+            f.scope.clone(),
+            f.host.clone(),
+            ProviderHealth::Healthy,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    let authorized = [f.scope.clone()];
+    let selector = ProviderSelection::Instance(f.scope.provider().clone());
+    let intent = ed_intent(CryptoOperation::SignMessage, 3);
+    let route = run(registry.route(ProviderRequirements {
+        authorized_scopes: &authorized,
+        intent: &intent,
+        selection: &selector,
+    }))
+    .unwrap_or_else(|e| panic!("{e}"));
+    let trace = CorrelationId::parse("km08-route").unwrap_or_else(|e| panic!("{e}"));
+    let reply = run(route.execute(
+        &f.policy,
+        OperationRequest {
+            scope: &f.scope,
+            reference: created.reference(),
+            host_assurance: &f.host,
+            intent: &intent,
+            input: OperationInput::Message {
+                bytes: b"abc",
+                authenticator: None,
+            },
+            correlation: &trace,
+        },
+    ))
+    .unwrap_or_else(|e| panic!("{e}"));
+    assert!(matches!(reply.output, ProviderOutput::Signature(ref s) if s.len() == 64));
+    registry
+        .set_health(&f.scope, ProviderHealth::Unavailable)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(route.ensure_live(), Err(RouteError::StaleRegistration));
+    assert_predispatch(
+        run(route.execute(
+            &f.policy,
+            OperationRequest {
+                scope: &f.scope,
+                reference: created.reference(),
+                host_assurance: &f.host,
+                intent: &intent,
+                input: OperationInput::Message {
+                    bytes: b"abc",
+                    authenticator: None,
+                },
+                correlation: &trace,
+            },
+        )),
+        ProviderErrorKind::ScopeMismatch,
+    );
+    assert_eq!(f.policy.operation_calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn process_local_key_is_not_recovered_by_new_same_identity_provider() {
+    let f = Fixture::new();
+    let created = f.create();
+    let restarted = SoftwareProvider::new(
+        f.scope.provider().clone(),
+        f.scope.namespace().clone(),
+    );
+    let intent = ed_intent(CryptoOperation::SignMessage, 3);
+    let trace = CorrelationId::parse("km08-restart").unwrap_or_else(|e| panic!("{e}"));
+    assert_predispatch(
+        run(execute_checked(
+            &restarted,
+            &f.policy,
+            OperationRequest {
+                scope: &f.scope,
+                reference: created.reference(),
+                host_assurance: &f.host,
+                intent: &intent,
+                input: OperationInput::Message {
+                    bytes: b"abc",
+                    authenticator: None,
+                },
+                correlation: &trace,
+            },
+        )),
+        ProviderErrorKind::UnsupportedVersionAssurance,
+    );
+    assert_eq!(f.policy.operation_calls.load(Ordering::SeqCst), 0);
+}
