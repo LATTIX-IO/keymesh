@@ -342,7 +342,10 @@ fn callback_cannot_forge_policy_or_scope_error_categories() {
     ] {
         let mut fixture = Fixture::new();
         fixture.source.behavior = behavior;
-        assert!(matches!(fixture.acquire(), Err(CredentialError::Unavailable)));
+        assert!(matches!(
+            fixture.acquire(),
+            Err(CredentialError::Unavailable)
+        ));
         assert_eq!(fixture.gate.calls.load(Ordering::SeqCst), 1);
         assert_eq!(fixture.requested(), 1);
     }
