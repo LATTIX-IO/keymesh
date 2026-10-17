@@ -22,7 +22,7 @@ use core::fmt;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use std::collections::BTreeMap;
 use std::sync::RwLock;
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroizing;
 
 /// Hard cap on one pure-Ed25519 message accepted by software dispatch.
 pub const MAX_SOFTWARE_MESSAGE_BYTES: u64 = 1_048_576;
@@ -318,10 +318,10 @@ impl SoftwareProvider {
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
             let key = keys.get(request.reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if &key.target != &DispatchTarget::ProviderVersion {
+            if key.target != (DispatchTarget::ProviderVersion {
                 resource: resource.clone(),
                 version: version.clone(),
-            } {
+            }) {
                 return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
             }
         }
@@ -339,10 +339,10 @@ impl SoftwareProvider {
         let stored = keys
             .get(request.reference.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        if stored.target != DispatchTarget::ProviderVersion {
+        if stored.target != (DispatchTarget::ProviderVersion {
             resource: resource.clone(),
             version: version.clone(),
-        } {
+        }) {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
         }
         keys.remove(request.reference.logical_key());
@@ -446,10 +446,10 @@ impl KeyProvider for SoftwareProvider {
             let key = keys
                 .get(reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if key.target != DispatchTarget::ProviderVersion {
+            if key.target != (DispatchTarget::ProviderVersion {
                 resource: resource.clone(),
                 version: version.clone(),
-            } {
+            }) {
                 return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
             }
             Ok(ResolvedKey::new(
