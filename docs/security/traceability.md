@@ -86,3 +86,26 @@ cargo run --locked -p keymesh --example provider_contract
 The test oracle has no cryptographic provider under test and cannot establish
 real provider capability, HSM custody, FIPS compliance, safe native retries,
 or key-material binding at the physical device. Those remain KM-06 onward.
+
+
+## KM-07 bounded secret and credential callback evidence (FOSS-408)
+
+This increment tests TM-06/INV-06,07 (secret-bearing metadata,
+accidental diagnostic exposure), TM-08/INV-01 (provider/tenant/operation
+scope), TM-13/INV-12 (secret allocation size/capacity bounds) and
+TM-15/INV-06,07 (unapproved export and raw secret dispatch).
+
+Rust `secret::tests` and `tests/credential_boundary.rs` cover move-only
+ownership, explicit wiping and Drop using RustCrypto `zeroize`,
+oversized/empty/excess-capacity rejection, static/redacted errors,
+compile-fail Clone/Display/AsRef/serde attempts, exact
+host/provider/tenant/operation checks, no credential-source callback after
+policy Deny/Indeterminate/Error, rejected mismatched callback responses,
+pending-future cancellation before source invocation and isolated
+parallel fake requests. Existing KM-05 tests continue to prove that
+`OperationInput::KeyMaterial` is rejected before provider dispatch.
+
+All tests use synthetic placeholder credentials. They do not prove
+physical erasure of allocator/OS/device memory, credential authenticity,
+IAM authorization, HSM compliance or real cryptographic enforcement.
+Future native adapters must close those gaps independently.
