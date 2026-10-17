@@ -75,6 +75,9 @@ jobs:
       - name: Execute provider registry example
         run: cargo run --locked -p keymesh --example provider_registry
 
+      - name: Execute scoped credential example
+        run: cargo run --locked -p keymesh --example credential_boundary
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -127,3 +130,6 @@ jobs:
 
       - name: Execute provider registry example at MSRV
         run: cargo run --locked -p keymesh --example provider_registry
+
+      - name: Execute scoped credential example at MSRV
+        run: cargo run --locked -p keymesh --example credential_boundary
