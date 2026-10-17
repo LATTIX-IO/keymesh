@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "protocol_revision": "vault.transit.1",
+  "feature_revision": "fixture.r1",
+  "reported_protection": "hsm",
+  "reported_version_model": "provider_version",
+  "reported_exportability": "public_only",
+  "attestation_claims": [
+    {
+      "kind": "vendor_declaration",
+      "source": "local_fixture",
+      "reference": "unverified.1"
+    }
+  ],
+  "entries": [
+    {
+      "operation": {
+        "type": "sign_digest",
+        "details": {
+          "digest": "sha256"
+        }
+      },
+      "profile": {
+        "family": "rsa_pss",
+        "parameters": {
+          "modulus_bits": 3072,
+          "digest": "sha256",
+          "mgf1_digest": "sha256",
+          "salt_bytes": 32
+        }
+      },
+      "support": "supported",
+      "max_input_bytes": 32
+    },
+    {
+      "operation": {
+        "type": "sign_message"
+      },
+      "profile": {
+        "family": "ecdsa",
+        "parameters": {
+          "curve": "p256",
+          "digest": "sha256",
+          "encoding": "der"
+        }
+      },
+      "support": "supported",
+      "max_input_bytes": 4096
+    },
+    {
+      "operation": {
+        "type": "wrap_key"
+      },
+      "profile": {
+        "family": "aes_key_wrap",
+        "parameters": {
+          "key_bits": 256,
+          "variant": "rfc3394"
+        }
+      },
+      "support": "unsupported",
+      "max_input_bytes": null
+    },
+    {
+      "operation": {
+        "type": "encapsulate"
+      },
+      "profile": {
+        "family": "ml_kem",
+        "parameters": {
+          "variant": "ml_kem1024"
+        }
+      },
+      "support": "unknown",
+      "max_input_bytes": null
+    },
+    {
+      "operation": {
+        "type": "sign_external_mu"
+      },
+      "profile": {
+        "family": "ml_dsa",
+        "parameters": {
+          "variant": "ml_dsa65",
+          "input": {
+            "mode": "external_mu"
+          }
+        }
+      },
+      "support": "supported",
+      "max_input_bytes": 64
+    },
+    {
+      "operation": {
+        "type": "verify_message"
+      },
+      "profile": {
+        "family": "slh_dsa",
+        "parameters": {
+          "variant": "shake256f"
+        }
+      },
+      "support": "supported",
+      "max_input_bytes": 4096
+    },
+    {
+      "operation": {
+        "type": "extension",
+        "details": {
+          "namespace": "org.example",
+          "identifier": "custom_op_v2"
+        }
+      },
+      "profile": {
+        "family": "extension",
+        "parameters": {
+          "namespace": "org.example",
+          "identifier": "future_algorithm_99",
+          "parameters": {
+            "custom_size": "v2",
+            "encoding": "opaque_20"
+          }
+        }
+      },
+      "support": "unknown",
+      "max_input_bytes": null
+    }
+  ]
+}
