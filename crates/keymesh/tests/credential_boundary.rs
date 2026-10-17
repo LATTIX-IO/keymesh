@@ -369,7 +369,6 @@ fn isolated_thread_requests_do_not_cross_tenant_scope() {
     }
 }
 
-
 #[test]
 fn concurrent_unauthorized_tenant_cannot_access_shared_host_credential_source() {
     let source = Arc::new(FakeSource::new());
@@ -383,7 +382,9 @@ fn concurrent_unauthorized_tenant_cannot_access_shared_host_credential_source() 
                     fixture.scope = HostScope::new(instance("mock-hsm"), namespace("tenant-b"));
                 }
                 let result = drive(acquire_scoped_credential(
-                    shared_source.as_ref(), &fixture.gate, fixture.request(),
+                    shared_source.as_ref(),
+                    &fixture.gate,
+                    fixture.request(),
                 ));
                 if index % 2 == 0 {
                     let mut owned = result.unwrap_or_else(|e| panic!("{e}"));
@@ -398,7 +399,9 @@ fn concurrent_unauthorized_tenant_cannot_access_shared_host_credential_source() 
         })
         .collect();
     for handle in handles {
-        handle.join().unwrap_or_else(|_| panic!("credential worker panicked"));
+        handle
+            .join()
+            .unwrap_or_else(|_| panic!("credential worker panicked"));
     }
     assert_eq!(source.calls.load(Ordering::SeqCst), 12);
 }
