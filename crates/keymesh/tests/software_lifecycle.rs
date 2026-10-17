@@ -475,3 +475,78 @@ fn snapshots_and_receipts_redact_structured_key_metadata_by_default() {
         assert_eq!(format!("{version:?}"), "SoftwareVersionSnapshot(<redacted>)");
     }
 }
+
+
+#[test]
+fn exact_version_policy_pending_is_invalidated_by_disable_enable_state_aba() {
+    let f = Fixture::new();
+    let original = f.create();
+    let permit_after_pause = Gate::permit();
+    permit_after_pause.pause.store(true, Ordering::Release);
+    let intent = intent(CryptoOperation::SignMessage, 3);
+    let trace = CorrelationId::parse("km09-exact-aba").unwrap_or_else(|e| panic!("{e}"));
+    let future = execute_checked(f.provider.as_ref(), &permit_after_pause, OperationRequest {
+        scope: &f.scope,
+        reference: original.reference(),
+        host_assurance: &f.host,
+        intent: &intent,
+        input: OperationInput::Message {
+            bytes: b"abc", authenticator: None,
+        },
+        correlation: &trace,
+    });
+    let mut future = Box::pin(future);
+    let mut cx = Context::from_waker(Waker::noop());
+    assert!(matches!(future.as_mut().poll(&mut cx), Poll::Pending));
+    let disabled = f.transition(
+        original.reference(), f.snapshot().generation(),
+        SoftwareTransitionAction::Disable, &f.permit,
+    ).unwrap_or_else(|e| panic!("{e}"));
+    f.transition(original.reference(), disabled.generation(),
+        SoftwareTransitionAction::Enable, &f.permit)
+        .unwrap_or_else(|e| panic!("{e}"));
+    permit_after_pause.pause.store(false, Ordering::Release);
+    rejected(match future.as_mut().poll(&mut cx) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("held sign did not finish"),
+    }, ProviderErrorKind::UnsupportedVersionAssurance);
+    assert_eq!(permit_after_pause.operation_calls.load(Ordering::SeqCst), 1);
+    // A newly resolved request can sign, but a pre-state-change Permit cannot.
+    assert!(f.signature(original.reference(), b"abc").is_ok());
+}
+
+#[test]
+fn latest_alias_verification_does_not_switch_versions_during_policy_wait() {
+    let f = Fixture::new();
+    let original = f.create();
+    let signed = f.signature(original.reference(), b"abc")
+        .unwrap_or_else(|e| panic!("{e}"));
+    let latest = f.alias(KeySelector::Latest);
+    let gate = Gate::permit();
+    gate.pause.store(true, Ordering::Release);
+    let verify = intent(CryptoOperation::VerifyMessage, 3);
+    let trace = CorrelationId::parse("km09-latest-race")
+        .unwrap_or_else(|e| panic!("{e}"));
+    let mut pending = Box::pin(execute_checked(f.provider.as_ref(), &gate,
+        OperationRequest {
+            scope: &f.scope, reference: &latest, host_assurance: &f.host,
+            intent: &verify,
+            input: OperationInput::Message {
+                bytes: b"abc", authenticator: Some(&signed),
+            },
+            correlation: &trace,
+        },
+    ));
+    let mut cx = Context::from_waker(Waker::noop());
+    assert!(matches!(pending.as_mut().poll(&mut cx), Poll::Pending));
+    f.rotate(original.reference(), f.snapshot().generation(), &f.permit)
+        .unwrap_or_else(|e| panic!("{e}"));
+    gate.pause.store(false, Ordering::Release);
+    rejected(match pending.as_mut().poll(&mut cx) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("stale Latest read did not finish"),
+    }, ProviderErrorKind::UnsupportedVersionAssurance);
+    // Host may separately permit historical verification using exact old ref.
+    assert!(f.verified(original.reference(), b"abc", &signed)
+        .unwrap_or_else(|e| panic!("{e}")));
+}
