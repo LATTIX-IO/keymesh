@@ -41,6 +41,7 @@ pub use capability::{
 
 pub use execution::{
     OperationCompletion, OperationEvidence, OperationInput, OperationRequest, PolicyContext,
+    MAX_VERIFICATION_PROOF_BYTES,
     PolicyGate, PolicyVerdict, execute_checked,
 };
 pub use provider::{
