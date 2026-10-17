@@ -3,9 +3,9 @@ use keymesh::{
     AlgorithmProfile as A, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry,
     CapabilityError, CryptoOperation as O, DigestAlgorithm as D, ExportRequirement, Exportability,
     HostScope, HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, OperationIntent,
-    PayloadDescriptor as P, ProviderInstanceId, ProviderNamespace,
-    ProfileError, ProtectionClass, ProtectionRequirement, ProviderCapabilities, SupportStatus,
-    VersionModel, VersionRequirement,
+    PayloadDescriptor as P, ProfileError, ProtectionClass, ProtectionRequirement,
+    ProviderCapabilities, ProviderInstanceId, ProviderNamespace, SupportStatus, VersionModel,
+    VersionRequirement,
 };
 
 fn rsa() -> A {
@@ -399,9 +399,15 @@ fn hkdf_capability_input_limit_counts_info_only_not_derived_output() {
     let mut req = request();
     req.operation = O::DeriveKey;
     req.profile = A::Hkdf { digest: D::Sha256 };
-    req.payload = P::Derivation { info_bytes: 10, output_bytes: 64 };
+    req.payload = P::Derivation {
+        info_bytes: 10,
+        output_bytes: 64,
+    };
     assert!(c.admit(&req, &host()).is_ok());
-    req.payload = P::Derivation { info_bytes: 11, output_bytes: 64 };
+    req.payload = P::Derivation {
+        info_bytes: 11,
+        output_bytes: 64,
+    };
     assert_eq!(
         c.admit(&req, &host()),
         Err(CapabilityError::PayloadTooLarge)
