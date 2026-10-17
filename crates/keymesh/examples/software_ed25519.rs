@@ -8,7 +8,7 @@
 
 use keymesh::{
     AlgorithmProfile, CorrelationId, CryptoOperation, EdDsaVariant, ExportRequirement, HostScope,
-    HostValidatedCapabilities, KeyProvider, LogicalKeyId, OperationInput, OperationIntent,
+    HostValidatedCapabilities, LogicalKeyId, OperationInput, OperationIntent,
     OperationRequest, PayloadDescriptor, PolicyContext, PolicyGate, PolicyVerdict, ProtectionClass,
     ProtectionRequirement, ProviderError, ProviderFuture, ProviderInstanceId, ProviderNamespace,
     ProviderOutput, SoftwareCreateRequest, SoftwareLifecycleContext, SoftwareLifecycleGate,
