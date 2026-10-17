@@ -72,6 +72,9 @@ jobs:
       - name: Execute provider contract example
         run: cargo run --locked -p keymesh --example provider_contract
 
+      - name: Execute provider registry example
+        run: cargo run --locked -p keymesh --example provider_registry
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -121,3 +124,6 @@ jobs:
 
       - name: Execute provider contract example at MSRV
         run: cargo run --locked -p keymesh --example provider_contract
+
+      - name: Execute provider registry example at MSRV
+        run: cargo run --locked -p keymesh --example provider_registry
