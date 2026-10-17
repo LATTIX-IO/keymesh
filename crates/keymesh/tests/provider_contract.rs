@@ -649,15 +649,24 @@ fn lost_ack_for_destructive_rotate_requires_reconciliation_not_automatic_retry()
 
 #[test]
 fn destructive_mutations_never_dispatch_to_unpinned_active_aliases() {
-    for operation in [CryptoOperation::Rotate, CryptoOperation::Purge, CryptoOperation::ScheduleDelete] {
+    for operation in [
+        CryptoOperation::Rotate,
+        CryptoOperation::Purge,
+        CryptoOperation::ScheduleDelete,
+    ] {
         let mut t = Fixture::new();
         t.intent.operation = operation;
         t.intent.payload = PayloadDescriptor::None;
         t.reference = KeyRef::new(
-            instance("mock-hsm"), namespace("tenant-a"), logical("payments"),
+            instance("mock-hsm"),
+            namespace("tenant-a"),
+            logical("payments"),
             KeySelector::Active,
         );
-        assert_pre_dispatch(t.run_with(OperationInput::None), ProviderErrorKind::InvalidInput);
+        assert_pre_dispatch(
+            t.run_with(OperationInput::None),
+            ProviderErrorKind::InvalidInput,
+        );
         assert_eq!(t.dispatched(), 0);
         assert_eq!(t.queried(), 0);
     }
@@ -668,14 +677,17 @@ fn key_material_operations_are_not_allowed_without_a_sensitive_input_boundary() 
     let mut t = Fixture::new();
     t.intent.operation = CryptoOperation::WrapKey;
     t.intent.profile = AlgorithmProfile::RsaOaep {
-        modulus_bits: 2048, digest: DigestAlgorithm::Sha256,
+        modulus_bits: 2048,
+        digest: DigestAlgorithm::Sha256,
         mgf1_digest: DigestAlgorithm::Sha256,
     };
     t.intent.payload = PayloadDescriptor::KeyMaterial { bytes: 32 };
     t.provider.catalog.entries[0].operation = CryptoOperation::WrapKey;
     t.provider.catalog.entries[0].profile = t.intent.profile.clone();
     let secret = [0xAB; 32];
-    assert_pre_dispatch(t.run_with(OperationInput::KeyMaterial(&secret)),
-        ProviderErrorKind::UnsupportedOperationOrProfile);
+    assert_pre_dispatch(
+        t.run_with(OperationInput::KeyMaterial(&secret)),
+        ProviderErrorKind::UnsupportedOperationOrProfile,
+    );
     assert_eq!(t.dispatched(), 0);
 }
