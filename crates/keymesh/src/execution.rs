@@ -217,6 +217,79 @@ impl fmt::Debug for OperationCompletion {
     }
 }
 
+/// Maximum byte length of a verification signature/MAC accepted at preflight.
+/// Individual profiles impose tighter checks; adapters validate signature
+/// encoding/DER and cryptographic correctness at their native boundary.
+pub const MAX_VERIFICATION_PROOF_BYTES: usize = 65_536;
+
+fn validate_authenticator(input: &OperationInput<'_>, intent: &OperationIntent)
+    -> Result<(), ProviderError>
+{
+    let proof = match input {
+        OperationInput::Message { authenticator, .. }
+        | OperationInput::Digest { authenticator, .. }
+        | OperationInput::ExternalMu { authenticator, .. } => *authenticator,
+        _ => None,
+    };
+    let Some(bytes) = proof else { return Ok(()); };
+    let n = bytes.len();
+    let invalid = || ProviderError::not_dispatched(ProviderErrorKind::InvalidInput);
+    if n == 0 || n > MAX_VERIFICATION_PROOF_BYTES {
+        return Err(invalid());
+    }
+    use crate::{AlgorithmProfile as A, EcCurve, EcdsaEncoding, EdDsaVariant};
+    let valid = match &intent.profile {
+        A::RsaPss { modulus_bits, .. } => n == usize::from(*modulus_bits) / 8,
+        A::Ecdsa { curve, encoding, .. } => {
+            let bytes_per_integer = match curve {
+                EcCurve::P256 => 32usize,
+                EcCurve::P384 => 48,
+                EcCurve::P521 => 66,
+            };
+            match encoding {
+                EcdsaEncoding::P1363 => n == bytes_per_integer * 2,
+                EcdsaEncoding::Der => (8..=(bytes_per_integer * 2 + 16)).contains(&n),
+            }
+        }
+        A::EdDsa { variant } => n == match variant {
+            EdDsaVariant::Ed25519 => 64,
+            EdDsaVariant::Ed448 => 114,
+        },
+        A::MlDsa { variant, .. } => n == match variant {
+            crate::MlDsaVariant::MlDsa44 => 2420,
+            crate::MlDsaVariant::MlDsa65 => 3309,
+            crate::MlDsaVariant::MlDsa87 => 4627,
+        },
+        A::SlhDsa { variant } => {
+            use crate::SlhDsaVariant as V;
+            n == match variant {
+                V::Sha2_128s | V::Shake128s => 7856,
+                V::Sha2_128f | V::Shake128f => 17088,
+                V::Sha2_192s | V::Shake192s => 16224,
+                V::Sha2_192f | V::Shake192f => 35664,
+                V::Sha2_256s | V::Shake256s => 29792,
+                V::Sha2_256f | V::Shake256f => 49856,
+            }
+        }
+        A::Hmac { digest, .. } => n == usize::from(digest.output_bytes()),
+        _ => false,
+    };
+    if !valid { return Err(invalid()); }
+    Ok(())
+}
+
+/// Capability and resolution reads are declared side-effect-free by the
+/// adapter contract. Their errors therefore cannot establish any operation
+/// commit state. Never report a read timeout as UnknownCommitState for crypto.
+fn read_error(error: ProviderError) -> ProviderError {
+    let kind = match error.kind() {
+        ProviderErrorKind::UnknownCommitState | ProviderErrorKind::InvalidOperationEvidence =>
+            ProviderErrorKind::Unavailable,
+        other => other,
+    };
+    ProviderError::not_dispatched(kind)
+}
+
 fn map_capability(error: CapabilityError) -> ProviderError {
     use CapabilityError as C;
     let kind = match error {
@@ -310,6 +383,7 @@ pub async fn execute_checked(
     if request.intent.payload != actual {
         return Err(invalid());
     }
+    validate_authenticator(&request.input, request.intent)?;
 
     // No new-key creation or raw sensitive-material operation until KM-07 has
     // a safe creation/secret ownership contract; do not forge a BoundKey.
@@ -346,11 +420,11 @@ pub async fn execute_checked(
         ));
     }
 
-    let catalog = provider.capabilities(request.scope).await?;
+    let catalog = provider.capabilities(request.scope).await.map_err(read_error)?;
     catalog
         .admit(request.intent, request.host_assurance)
         .map_err(map_capability)?;
-    let resolved = provider.resolve(request.scope, request.reference).await?;
+    let resolved = provider.resolve(request.scope, request.reference).await.map_err(read_error)?;
     let bound = preflight_bind(
         request.reference,
         request.scope,
