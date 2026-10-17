@@ -53,4 +53,5 @@ pub use provider::{
 pub use registry::{
     MAX_REGISTERED_PROVIDERS, ProviderHealth, ProviderRegistry, ProviderRequirements,
     ProviderSelection, RegistrationError, RejectionReason, RouteError, RouteTrace, RoutedProvider,
+    RoutingFailure,
 };
