@@ -16,6 +16,8 @@ mod identity;
 mod provider;
 mod registry;
 mod secret;
+#[cfg(feature = "software-provider")]
+mod software;
 mod uri;
 
 pub use binding::{
@@ -63,3 +65,10 @@ pub use credential::{
     CredentialRequest, CredentialSource, ScopedCredential, acquire_scoped_credential,
 };
 pub use secret::{KeyMaterial, MAX_SECRET_BYTES, SecretBytes, SecretError};
+
+#[cfg(feature = "software-provider")]
+pub use software::{
+    MAX_SOFTWARE_KEYS, MAX_SOFTWARE_MESSAGE_BYTES, CreatedSoftwareKey, SoftwareCreateRequest,
+    SoftwareLifecycleAction, SoftwareLifecycleContext, SoftwareLifecycleGate,
+    SoftwareProvider, SoftwarePurgeRequest,
+};
