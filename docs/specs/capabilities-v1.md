@@ -59,6 +59,15 @@ and no dispatch on Unknown.
   applies the RSA-OAEP plaintext bound `k - 2*hLen - 2` and exact ciphertext
   length to the corresponding metadata. Separate wrap permissions remain
   mandatory even if an adapter uses the same RSA-OAEP primitive.
+- RFC 3394 key unwrap requires at least 24 ciphertext bytes (8-byte
+  integrity register plus two 8-byte key blocks); RFC 5649 padded unwrap
+  permits a 16-byte ciphertext. Both are multiples of 8 bytes.
+- ML-KEM encapsulation ciphertexts have **fixed sizes**: 768 bytes for
+  ML-KEM-512, 1088 for ML-KEM-768 and 1568 for ML-KEM-1024. A ciphertext
+  for one parameter set cannot be decapsulated under another profile.
+- HKDF provider `max_input_bytes` measures the supplied `info` input, not
+  the number of derived output bytes. HKDF's independent 255·HashLen
+  output bound is checked by the typed operation contract.
 - ECDSA includes curve, digest and signature encoding (DER/P1363).
 - Pure Ed25519/Ed448 are message-only. Ed25519ph is intentionally not
   treated as arbitrary `SignDigest(SHA-512)`; a future profile must specify
@@ -90,7 +99,9 @@ reported exportability, optionally *unverified* attestation claim refs,
 and exact operation+profile entries. The current Rust API accepts JSON
 via serde; the release schema is **versioned** and rejects unknown
 top-level fields, incompatible schema numbers and duplicate entries.
-Only the explicit `Extension` envelope permits unknown vendor values.
+Standard algorithm/operation/payload tagged enums also deny unknown nested
+JSON fields: an unrecognized constraint must not be silently discarded
+before capability negotiation. Only the explicit `Extension` envelope permits unknown vendor values.
 
 - `SupportStatus` = Supported / Unsupported / Unknown.
 - `ProtectionClass` = Unknown / Software / Tee / Hsm.
