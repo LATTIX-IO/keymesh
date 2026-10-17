@@ -85,23 +85,41 @@ impl fmt::Debug for SoftwareLifecycleEvidence {
 }
 impl SoftwareLifecycleEvidence {
     /// The separately policy-approved state machine action.
-    pub fn action(&self) -> SoftwareLifecycleAction { self.action }
+    pub fn action(&self) -> SoftwareLifecycleAction {
+        self.action
+    }
     /// Authorized, exact tenant/provider scope.
-    pub fn scope(&self) -> &HostScope { &self.scope }
+    pub fn scope(&self) -> &HostScope {
+        &self.scope
+    }
     /// Logical name; metadata only, never a credential.
-    pub fn logical_key(&self) -> &LogicalKeyId { &self.logical_key }
+    pub fn logical_key(&self) -> &LogicalKeyId {
+        &self.logical_key
+    }
     /// Exact previous provider version, where applicable.
-    pub fn previous(&self) -> Option<&KeyRef> { self.previous.as_ref() }
+    pub fn previous(&self) -> Option<&KeyRef> {
+        self.previous.as_ref()
+    }
     /// New/existing affected exact provider version, if not purged.
-    pub fn current(&self) -> Option<&KeyRef> { self.current.as_ref() }
+    pub fn current(&self) -> Option<&KeyRef> {
+        self.current.as_ref()
+    }
     /// Status prior to the committed action, where applicable.
-    pub fn from(&self) -> Option<SoftwareVersionState> { self.from }
+    pub fn from(&self) -> Option<SoftwareVersionState> {
+        self.from
+    }
     /// Status after the committed action, if retained.
-    pub fn to(&self) -> Option<SoftwareVersionState> { self.to }
+    pub fn to(&self) -> Option<SoftwareVersionState> {
+        self.to
+    }
     /// Strictly increasing in-process lifecycle generation.
-    pub fn generation(&self) -> u64 { self.generation }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
     /// Optional safe, host-issued correlation label.
-    pub fn correlation(&self) -> Option<&CorrelationId> { self.correlation.as_ref() }
+    pub fn correlation(&self) -> Option<&CorrelationId> {
+        self.correlation.as_ref()
+    }
 }
 
 /// Public metadata for one independently selectable provider key version.
@@ -113,11 +131,17 @@ pub struct SoftwareVersionSnapshot {
 }
 impl SoftwareVersionSnapshot {
     /// Immutable concrete version/ID.
-    pub fn reference(&self) -> &KeyRef { &self.reference }
+    pub fn reference(&self) -> &KeyRef {
+        &self.reference
+    }
     /// Mutable authorization state, never evidence of hardware custody.
-    pub fn status(&self) -> SoftwareVersionState { self.status }
+    pub fn status(&self) -> SoftwareVersionState {
+        self.status
+    }
     /// Monotonic version creation order (not a wall clock).
-    pub fn issued_generation(&self) -> u64 { self.issued_generation }
+    pub fn issued_generation(&self) -> u64 {
+        self.issued_generation
+    }
 }
 impl fmt::Debug for SoftwareVersionSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -136,13 +160,21 @@ pub struct SoftwareLogicalSnapshot {
 }
 impl SoftwareLogicalSnapshot {
     /// CAS generation to send back with a specific state-changing operation.
-    pub fn generation(&self) -> u64 { self.generation }
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
     /// Exact active version, if one exists.
-    pub fn active(&self) -> Option<&KeyRef> { self.active.as_ref() }
+    pub fn active(&self) -> Option<&KeyRef> {
+        self.active.as_ref()
+    }
     /// Most recently generated retained version, not necessarily active.
-    pub fn latest(&self) -> Option<&KeyRef> { self.latest.as_ref() }
+    pub fn latest(&self) -> Option<&KeyRef> {
+        self.latest.as_ref()
+    }
     /// Bound on retained historical versions (max 32 per logical key).
-    pub fn versions(&self) -> &[SoftwareVersionSnapshot] { &self.versions }
+    pub fn versions(&self) -> &[SoftwareVersionSnapshot] {
+        &self.versions
+    }
 }
 impl fmt::Debug for SoftwareLogicalSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -157,9 +189,13 @@ pub struct SoftwareRotation {
 }
 impl SoftwareRotation {
     /// Exact new target and public Ed25519 verification key.
-    pub fn created(&self) -> &CreatedSoftwareKey { &self.created }
+    pub fn created(&self) -> &CreatedSoftwareKey {
+        &self.created
+    }
     /// Monotonic lifecycle receipt, redacted under Debug.
-    pub fn evidence(&self) -> &SoftwareLifecycleEvidence { &self.evidence }
+    pub fn evidence(&self) -> &SoftwareLifecycleEvidence {
+        &self.evidence
+    }
 }
 impl fmt::Debug for SoftwareRotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -180,7 +216,10 @@ impl SoftwareProvider {
         }
     }
 
-    fn require_exact<'a>(&self, reference: &'a KeyRef) -> Result<(&'a ProviderResourceId, &'a ProviderVersionId), ProviderError> {
+    fn require_exact<'a>(
+        &self,
+        reference: &'a KeyRef,
+    ) -> Result<(&'a ProviderResourceId, &'a ProviderVersionId), ProviderError> {
         if reference.provider() != &self.instance || reference.namespace() != &self.namespace {
             return Err(denied(ProviderErrorKind::ScopeMismatch));
         }
@@ -191,22 +230,33 @@ impl SoftwareProvider {
     }
 
     fn next_generation(state: &SoftwareState) -> Result<u64, ProviderError> {
-        state.next_generation.checked_add(1)
+        state
+            .next_generation
+            .checked_add(1)
             .ok_or_else(|| denied(ProviderErrorKind::Unavailable))
     }
 
     fn make_reference(&self, name: &LogicalKeyId, entry: &StoredKey) -> KeyRef {
         let (resource, version) = match &entry.target {
-            DispatchTarget::ProviderVersion { resource, version } => (resource.clone(), version.clone()),
+            DispatchTarget::ProviderVersion { resource, version } => {
+                (resource.clone(), version.clone())
+            }
             _ => unreachable!("SoftwareProvider only stores exact provider versions"),
         };
-        KeyRef::new(self.instance.clone(), self.namespace.clone(), name.clone(),
-            KeySelector::ExactProviderVersion { resource, version })
+        KeyRef::new(
+            self.instance.clone(),
+            self.namespace.clone(),
+            name.clone(),
+            KeySelector::ExactProviderVersion { resource, version },
+        )
     }
 
     // OS randomness is sampled only after a lifecycle Permit, while under
     // the final mutation lock. A failure leaves state untouched.
-    fn fresh_material(&self, generation: u64) -> Result<(StoredKey, ProviderResourceId, ProviderVersionId), ProviderError> {
+    fn fresh_material(
+        &self,
+        generation: u64,
+    ) -> Result<(StoredKey, ProviderResourceId, ProviderVersionId), ProviderError> {
         let mut seed = Zeroizing::new(vec![0u8; 32]);
         getrandom::getrandom(&mut seed).map_err(|_| denied(ProviderErrorKind::Unavailable))?;
         let mut nonce = Zeroizing::new([0u8; 16]);
@@ -221,13 +271,20 @@ impl SoftwareProvider {
         let public_key = SigningKey::from_bytes(seed_ref).verifying_key().to_bytes();
         let material = KeyMaterial::from_vec(std::mem::take(&mut *seed))
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        Ok((StoredKey {
-            target: DispatchTarget::ProviderVersion {
-                resource: resource.clone(), version: version.clone(),
+        Ok((
+            StoredKey {
+                target: DispatchTarget::ProviderVersion {
+                    resource: resource.clone(),
+                    version: version.clone(),
+                },
+                public_key,
+                material,
+                status: SoftwareVersionState::Active,
+                issued_order: generation,
             },
-            public_key, material, status: SoftwareVersionState::Active,
-            issued_order: generation,
-        }, resource, version))
+            resource,
+            version,
+        ))
     }
 
     fn check_current(
@@ -236,7 +293,9 @@ impl SoftwareProvider {
         reference: &KeyRef,
     ) -> Result<ProviderVersionId, ProviderError> {
         let (resource, version) = self.require_exact(reference)?;
-        let existing = record.versions.get(version)
+        let existing = record
+            .versions
+            .get(version)
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         if existing.target.resource() != resource {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
@@ -255,21 +314,34 @@ impl SoftwareProvider {
     /// Scope-bounded snapshot. This is metadata only and is NOT an IAM policy
     /// decision; the host must authenticate metadata access independently.
     pub fn snapshot(
-        &self, scope: &HostScope, host_assurance: &HostValidatedCapabilities,
+        &self,
+        scope: &HostScope,
+        host_assurance: &HostValidatedCapabilities,
         logical: &LogicalKeyId,
     ) -> Result<SoftwareLogicalSnapshot, ProviderError> {
         self.require_scope(scope, host_assurance)?;
-        let state = self.keys.read()
+        let state = self
+            .keys
+            .read()
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        let record = state.records.get(logical)
+        let record = state
+            .records
+            .get(logical)
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        let versions = record.versions.values().map(|entry| SoftwareVersionSnapshot {
-            reference: self.make_reference(logical, entry),
-            status: entry.status,
-            issued_generation: entry.issued_order,
-        }).collect();
+        let versions = record
+            .versions
+            .values()
+            .map(|entry| SoftwareVersionSnapshot {
+                reference: self.make_reference(logical, entry),
+                status: entry.status,
+                issued_generation: entry.issued_order,
+            })
+            .collect();
         let to_ref = |version: &ProviderVersionId| {
-            record.versions.get(version).map(|entry| self.make_reference(logical, entry))
+            record
+                .versions
+                .get(version)
+                .map(|entry| self.make_reference(logical, entry))
         };
         Ok(SoftwareLogicalSnapshot {
             generation: record.generation,
@@ -282,7 +354,8 @@ impl SoftwareProvider {
     /// KM-08 backwards-compatible initial creation. No old version is
     /// overwritten; an existing logical key remains a hard conflict.
     pub(super) async fn create_initial(
-        &self, policy: &dyn SoftwareLifecycleGate,
+        &self,
+        policy: &dyn SoftwareLifecycleGate,
         request: SoftwareCreateRequest<'_>,
     ) -> Result<CreatedSoftwareKey, ProviderError> {
         self.require_scope(request.scope, request.host_assurance)?;
@@ -290,21 +363,31 @@ impl SoftwareProvider {
             return Err(denied(ProviderErrorKind::UnsupportedOperationOrProfile));
         }
         {
-            let state = self.keys.read()
+            let state = self
+                .keys
+                .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            if state.records.contains_key(request.logical_key) || state.total_versions >= MAX_SOFTWARE_KEYS {
+            if state.records.contains_key(request.logical_key)
+                || state.total_versions >= MAX_SOFTWARE_KEYS
+            {
                 return Err(denied(ProviderErrorKind::InvalidInput));
             }
         }
         let ctx = SoftwareLifecycleContext {
-            scope: request.scope, logical_key: request.logical_key,
-            action: SoftwareLifecycleAction::Generate, reference: None,
+            scope: request.scope,
+            logical_key: request.logical_key,
+            action: SoftwareLifecycleAction::Generate,
+            reference: None,
             expected_generation: None,
         };
         policy_result(policy.authorize(&ctx).await)?;
-        let mut state = self.keys.write()
+        let mut state = self
+            .keys
+            .write()
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        if state.records.contains_key(request.logical_key) || state.total_versions >= MAX_SOFTWARE_KEYS {
+        if state.records.contains_key(request.logical_key)
+            || state.total_versions >= MAX_SOFTWARE_KEYS
+        {
             return Err(denied(ProviderErrorKind::InvalidInput));
         }
         let generation = Self::next_generation(&state)?;
@@ -312,17 +395,26 @@ impl SoftwareProvider {
         let public_key = stored.public_key;
         let mut versions = BTreeMap::new();
         versions.insert(version.clone(), stored);
-        state.records.insert(request.logical_key.clone(), LogicalRecord {
-            versions, active: Some(version.clone()), latest: Some(version.clone()),
-            generation,
-        });
+        state.records.insert(
+            request.logical_key.clone(),
+            LogicalRecord {
+                versions,
+                active: Some(version.clone()),
+                latest: Some(version.clone()),
+                generation,
+            },
+        );
         state.total_versions += 1;
         state.next_generation = generation;
         Ok(CreatedSoftwareKey {
             reference: KeyRef::new(
-                self.instance.clone(), self.namespace.clone(), request.logical_key.clone(),
+                self.instance.clone(),
+                self.namespace.clone(),
+                request.logical_key.clone(),
                 KeySelector::ExactProviderVersion { resource, version },
-            ), public_key, generation,
+            ),
+            public_key,
+            generation,
         })
     }
 
@@ -330,7 +422,8 @@ impl SoftwareProvider {
     /// fresh, immutable CSPRNG-backed active version. No fallback, overwrite,
     /// implicit alias dispatch or key-material copy occurs.
     pub async fn rotate(
-        &self, policy: &dyn SoftwareLifecycleGate,
+        &self,
+        policy: &dyn SoftwareLifecycleGate,
         request: SoftwareRotateRequest<'_>,
     ) -> Result<SoftwareRotation, ProviderError> {
         self.require_scope(request.scope, request.host_assurance)?;
@@ -339,45 +432,65 @@ impl SoftwareProvider {
             return Err(denied(ProviderErrorKind::UnsupportedOperationOrProfile));
         }
         {
-            let state = self.keys.read()
+            let state = self
+                .keys
+                .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let record = state.records.get(request.previous.logical_key())
+            let record = state
+                .records
+                .get(request.previous.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             Self::check_generation(record, request.expected_generation)?;
             self.check_current(record, request.previous)?;
             if record.active.as_ref() != Some(prior_version)
-                || record.versions.get(prior_version).map(|v| v.status) != Some(SoftwareVersionState::Active) {
+                || record.versions.get(prior_version).map(|v| v.status)
+                    != Some(SoftwareVersionState::Active)
+            {
                 return Err(denied(ProviderErrorKind::AuthorizationDenied));
             }
-            if state.total_versions >= MAX_SOFTWARE_KEYS || record.versions.len() >= MAX_SOFTWARE_VERSIONS_PER_KEY {
+            if state.total_versions >= MAX_SOFTWARE_KEYS
+                || record.versions.len() >= MAX_SOFTWARE_VERSIONS_PER_KEY
+            {
                 return Err(denied(ProviderErrorKind::InvalidInput));
             }
         }
         let ctx = SoftwareLifecycleContext {
-            scope: request.scope, logical_key: request.previous.logical_key(),
-            action: SoftwareLifecycleAction::Rotate, reference: Some(request.previous),
+            scope: request.scope,
+            logical_key: request.previous.logical_key(),
+            action: SoftwareLifecycleAction::Rotate,
+            reference: Some(request.previous),
             expected_generation: Some(request.expected_generation),
         };
         policy_result(policy.authorize(&ctx).await)?;
-        let mut state = self.keys.write()
+        let mut state = self
+            .keys
+            .write()
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
         let generation = Self::next_generation(&state)?;
         {
-            let record = state.records.get(request.previous.logical_key())
+            let record = state
+                .records
+                .get(request.previous.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             Self::check_generation(record, request.expected_generation)?;
             self.check_current(record, request.previous)?;
             if record.active.as_ref() != Some(prior_version)
-                || record.versions.get(prior_version).map(|v| v.status) != Some(SoftwareVersionState::Active) {
+                || record.versions.get(prior_version).map(|v| v.status)
+                    != Some(SoftwareVersionState::Active)
+            {
                 return Err(denied(ProviderErrorKind::AuthorizationDenied));
             }
-            if state.total_versions >= MAX_SOFTWARE_KEYS || record.versions.len() >= MAX_SOFTWARE_VERSIONS_PER_KEY {
+            if state.total_versions >= MAX_SOFTWARE_KEYS
+                || record.versions.len() >= MAX_SOFTWARE_VERSIONS_PER_KEY
+            {
                 return Err(denied(ProviderErrorKind::InvalidInput));
             }
         }
         let (stored, resource, version) = self.fresh_material(generation)?;
         let public_key = stored.public_key;
-        let record = state.records.get_mut(request.previous.logical_key())
+        let record = state
+            .records
+            .get_mut(request.previous.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         if record.versions.contains_key(&version) {
             return Err(denied(ProviderErrorKind::Unavailable));
@@ -392,13 +505,16 @@ impl SoftwareProvider {
         state.total_versions += 1;
         state.next_generation = generation;
         let reference = KeyRef::new(
-            self.instance.clone(), self.namespace.clone(),
+            self.instance.clone(),
+            self.namespace.clone(),
             request.previous.logical_key().clone(),
             KeySelector::ExactProviderVersion { resource, version },
         );
         Ok(SoftwareRotation {
             created: CreatedSoftwareKey {
-                reference: reference.clone(), public_key, generation,
+                reference: reference.clone(),
+                public_key,
+                generation,
             },
             evidence: SoftwareLifecycleEvidence {
                 action: SoftwareLifecycleAction::Rotate,
@@ -415,18 +531,29 @@ impl SoftwareProvider {
     }
 
     fn permitted_transition(
-        record: &LogicalRecord, version: &ProviderVersionId,
+        record: &LogicalRecord,
+        version: &ProviderVersionId,
         action: SoftwareTransitionAction,
     ) -> Result<(SoftwareVersionState, SoftwareVersionState), ProviderError> {
-        let prior = record.versions.get(version)
-            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?.status;
+        let prior = record
+            .versions
+            .get(version)
+            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?
+            .status;
         let next = match (prior, action) {
-            (SoftwareVersionState::Active | SoftwareVersionState::Retired, SoftwareTransitionAction::Disable) =>
-                SoftwareVersionState::Disabled,
+            (
+                SoftwareVersionState::Active | SoftwareVersionState::Retired,
+                SoftwareTransitionAction::Disable,
+            ) => SoftwareVersionState::Disabled,
             (SoftwareVersionState::Disabled, SoftwareTransitionAction::Enable)
-                if record.active.is_none() => SoftwareVersionState::Active,
-            (SoftwareVersionState::Retired | SoftwareVersionState::Disabled, SoftwareTransitionAction::ScheduleDelete) =>
-                SoftwareVersionState::PendingDeletion,
+                if record.active.is_none() =>
+            {
+                SoftwareVersionState::Active
+            }
+            (
+                SoftwareVersionState::Retired | SoftwareVersionState::Disabled,
+                SoftwareTransitionAction::ScheduleDelete,
+            ) => SoftwareVersionState::PendingDeletion,
             _ => return Err(denied(ProviderErrorKind::AuthorizationDenied)),
         };
         Ok((prior, next))
@@ -436,30 +563,41 @@ impl SoftwareProvider {
     /// Invalid transitions perform zero mutation. No background timer or
     /// automatic key-resurrection is implemented.
     pub async fn transition(
-        &self, policy: &dyn SoftwareLifecycleGate,
+        &self,
+        policy: &dyn SoftwareLifecycleGate,
         request: SoftwareTransitionRequest<'_>,
     ) -> Result<SoftwareLifecycleEvidence, ProviderError> {
         self.require_scope(request.scope, request.host_assurance)?;
         let (_, version) = self.require_exact(request.reference)?;
         {
-            let state = self.keys.read()
+            let state = self
+                .keys
+                .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let record = state.records.get(request.reference.logical_key())
+            let record = state
+                .records
+                .get(request.reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             Self::check_generation(record, request.expected_generation)?;
             self.check_current(record, request.reference)?;
             Self::permitted_transition(record, version, request.action)?;
         }
         let ctx = SoftwareLifecycleContext {
-            scope: request.scope, logical_key: request.reference.logical_key(),
-            action: request.action.policy_action(), reference: Some(request.reference),
+            scope: request.scope,
+            logical_key: request.reference.logical_key(),
+            action: request.action.policy_action(),
+            reference: Some(request.reference),
             expected_generation: Some(request.expected_generation),
         };
         policy_result(policy.authorize(&ctx).await)?;
-        let mut state = self.keys.write()
+        let mut state = self
+            .keys
+            .write()
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
         let generation = Self::next_generation(&state)?;
-        let record = state.records.get_mut(request.reference.logical_key())
+        let record = state
+            .records
+            .get_mut(request.reference.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         Self::check_generation(record, request.expected_generation)?;
         self.check_current(record, request.reference)?;
@@ -477,10 +615,13 @@ impl SoftwareProvider {
         state.next_generation = generation;
         Ok(SoftwareLifecycleEvidence {
             action: request.action.policy_action(),
-            scope: request.scope.clone(), logical_key: request.reference.logical_key().clone(),
+            scope: request.scope.clone(),
+            logical_key: request.reference.logical_key().clone(),
             previous: Some(request.reference.clone()),
             current: Some(request.reference.clone()),
-            from: Some(prior), to: Some(next), generation,
+            from: Some(prior),
+            to: Some(next),
+            generation,
             correlation: request.correlation.cloned(),
         })
     }
@@ -489,38 +630,60 @@ impl SoftwareProvider {
     /// receipt. Purging an active version remains explicitly allowed to
     /// preserve KM-08 behavior; production hosts should disable first.
     pub async fn purge_with_evidence(
-        &self, policy: &dyn SoftwareLifecycleGate,
+        &self,
+        policy: &dyn SoftwareLifecycleGate,
         request: SoftwarePurgeRequest<'_>,
     ) -> Result<SoftwareLifecycleEvidence, ProviderError> {
         self.require_scope(request.scope, request.host_assurance)?;
         let (_, version) = self.require_exact(request.reference)?;
         let (expected_generation, prior_status) = {
-            let state = self.keys.read()
+            let state = self
+                .keys
+                .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let record = state.records.get(request.reference.logical_key())
+            let record = state
+                .records
+                .get(request.reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             let selected = self.check_current(record, request.reference)?;
-            (record.generation, record.versions.get(&selected)
-                .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?.status)
+            (
+                record.generation,
+                record
+                    .versions
+                    .get(&selected)
+                    .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?
+                    .status,
+            )
         };
         let ctx = SoftwareLifecycleContext {
-            scope: request.scope, logical_key: request.reference.logical_key(),
-            action: SoftwareLifecycleAction::Purge, reference: Some(request.reference),
+            scope: request.scope,
+            logical_key: request.reference.logical_key(),
+            action: SoftwareLifecycleAction::Purge,
+            reference: Some(request.reference),
             expected_generation: Some(expected_generation),
         };
         policy_result(policy.authorize(&ctx).await)?;
-        let mut state = self.keys.write()
+        let mut state = self
+            .keys
+            .write()
             .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
         let generation = Self::next_generation(&state)?;
-        let record = state.records.get_mut(request.reference.logical_key())
+        let record = state
+            .records
+            .get_mut(request.reference.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         Self::check_generation(record, expected_generation)?;
         self.check_current(record, request.reference)?;
         record.versions.remove(version);
-        if record.active.as_ref() == Some(version) { record.active = None; }
+        if record.active.as_ref() == Some(version) {
+            record.active = None;
+        }
         if record.latest.as_ref() == Some(version) {
-            record.latest = record.versions.iter()
-                .max_by_key(|(_, v)| v.issued_order).map(|(id, _)| id.clone());
+            record.latest = record
+                .versions
+                .iter()
+                .max_by_key(|(_, v)| v.issued_order)
+                .map(|(id, _)| id.clone());
         }
         record.generation = generation;
         if record.versions.is_empty() {
@@ -530,15 +693,20 @@ impl SoftwareProvider {
         state.next_generation = generation;
         Ok(SoftwareLifecycleEvidence {
             action: SoftwareLifecycleAction::Purge,
-            scope: request.scope.clone(), logical_key: request.reference.logical_key().clone(),
-            previous: Some(request.reference.clone()), current: None,
-            from: Some(prior_status), to: None, generation,
+            scope: request.scope.clone(),
+            logical_key: request.reference.logical_key().clone(),
+            previous: Some(request.reference.clone()),
+            current: None,
+            from: Some(prior_status),
+            to: None,
+            generation,
             correlation: None,
         })
     }
 
     pub(super) async fn purge_exact(
-        &self, policy: &dyn SoftwareLifecycleGate,
+        &self,
+        policy: &dyn SoftwareLifecycleGate,
         request: SoftwarePurgeRequest<'_>,
     ) -> Result<(), ProviderError> {
         self.purge_with_evidence(policy, request).await.map(|_| ())
