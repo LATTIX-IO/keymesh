@@ -756,3 +756,31 @@ fn routing_debug_and_failure_messages_do_not_emit_registered_provider_names() {
         assert!(!text.contains("tenant-secret"));
     }
 }
+
+
+#[test]
+fn failure_trace_reports_only_authorized_candidates_and_static_reasons() {
+    let registry = ProviderRegistry::new();
+    let approved = Fake::new("a-hsm", "tenant-a", ProtectionClass::Hsm);
+    let other = Fake::new("b-other", "tenant-b", ProtectionClass::Hsm);
+    register(&registry, &approved, "tenant-a", ProtectionClass::Hsm, ProviderHealth::Unknown);
+    register(&registry, &other, "tenant-b", ProtectionClass::Hsm, ProviderHealth::Healthy);
+    let allowed = [scope("a-hsm", "tenant-a")];
+    let select = ProviderSelection::AnyCompatible;
+    let i = intent();
+    match drive(registry.route_diagnostic(ProviderRequirements {
+        authorized_scopes: &allowed, intent: &i, selection: &select,
+    })) {
+        Err(failure) => {
+            assert_eq!(failure.kind, RouteError::NoCompatibleProvider);
+            assert_eq!(failure.trace.examined, 1);
+            assert_eq!(failure.trace.rejected, 1);
+            assert_eq!(failure.trace.count(RejectionReason::NotHealthy), 1);
+            assert!(!format!("{failure:?} {failure}").contains("b-other"));
+            assert!(!format!("{failure:?} {failure}").contains("tenant-b"));
+        }
+        Ok(_) => panic!("unknown-health provider unexpectedly chosen"),
+    }
+    assert_eq!(other.reads.load(Ordering::SeqCst), 0);
+    assert_eq!(approved.crypto_calls.load(Ordering::SeqCst), 0);
+}
