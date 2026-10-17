@@ -181,6 +181,27 @@ impl fmt::Display for RouteError {
 }
 impl std::error::Error for RouteError {}
 
+/// Safe diagnostics for a failed route, including only *authorized* candidate
+/// counts and fixed static reason categories. No tenant/provider labels.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoutingFailure {
+    /// Static routing error kind.
+    pub kind: RouteError,
+    /// Bounded rejection counts, never raw backend diagnostics.
+    pub trace: RouteTrace,
+}
+impl RoutingFailure {
+    fn new(kind: RouteError, trace: RouteTrace) -> Self {
+        Self { kind, trace }
+    }
+}
+impl fmt::Display for RoutingFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+impl std::error::Error for RoutingFailure {}
+
 struct Registration {
     provider: Arc<dyn KeyProvider>,
     scope: HostScope,
@@ -304,14 +325,24 @@ impl ProviderRegistry {
         &self,
         requirements: ProviderRequirements<'_>,
     ) -> Result<RoutedProvider, RouteError> {
+        self.route_diagnostic(requirements).await.map_err(|failure| failure.kind)
+    }
+
+    /// Like route(), but also returns a bounded, redacted rejection summary
+    /// on failure. Counts cover only host-authorized candidates.
+    pub async fn route_diagnostic(
+        &self,
+        requirements: ProviderRequirements<'_>,
+    ) -> Result<RoutedProvider, RoutingFailure> {
+        let mut trace = RouteTrace::new();
         requirements
             .intent
             .validate()
-            .map_err(|_| RouteError::InvalidRequirements)?;
+            .map_err(|_| RoutingFailure::new(RouteError::InvalidRequirements, trace.clone()))?;
         // Every provider is independently authorized for the same tenant.
         // A caller cannot substitute a different tenant during AnyCompatible.
         let Some(first) = requirements.authorized_scopes.first() else {
-            return Err(RouteError::InvalidRequirements);
+            return Err(RoutingFailure::new(RouteError::InvalidRequirements, trace));
         };
         if requirements.authorized_scopes.len() > MAX_REGISTERED_PROVIDERS
             || requirements
@@ -319,26 +350,29 @@ impl ProviderRegistry {
                 .iter()
                 .any(|scope| scope.namespace() != first.namespace())
         {
-            return Err(RouteError::InvalidRequirements);
+            return Err(RoutingFailure::new(RouteError::InvalidRequirements, trace));
         }
         let candidates = {
             let state = self
                 .inner
                 .read()
-                .map_err(|_| RouteError::RegistryUnavailable)?;
+                .map_err(|_| RoutingFailure::new(RouteError::RegistryUnavailable, trace.clone()))?;
             match requirements.selection {
                 ProviderSelection::Instance(id) => state
                     .entries
                     .get(id)
+                    .filter(|entry| requirements.authorized_scopes.contains(&entry.scope))
                     .cloned()
                     .into_iter()
                     .collect::<Vec<_>>(),
-                ProviderSelection::AnyCompatible => {
-                    state.entries.values().cloned().collect::<Vec<_>>()
-                }
+                ProviderSelection::AnyCompatible => state
+                    .entries
+                    .values()
+                    .filter(|entry| requirements.authorized_scopes.contains(&entry.scope))
+                    .cloned()
+                    .collect::<Vec<_>>(),
             }
         };
-        let mut trace = RouteTrace::new();
         for entry in candidates {
             trace.examined += 1;
             if !entry.is_live() {
@@ -397,7 +431,7 @@ impl ProviderRegistry {
                 trace,
             });
         }
-        Err(RouteError::NoCompatibleProvider)
+        Err(RoutingFailure::new(RouteError::NoCompatibleProvider, trace))
     }
 }
 
