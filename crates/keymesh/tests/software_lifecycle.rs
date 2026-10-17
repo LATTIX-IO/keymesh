@@ -850,7 +850,7 @@ fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
     let mut last_generation = 0_u64;
     for step in 0..12 {
         let before = f.snapshot();
-        assert!(before.generation() > last_generation);
+        assert!(before.generation() >= last_generation);
         assert!(before.versions().len() <= MAX_SOFTWARE_VERSIONS_PER_KEY);
         assert_eq!(
             before.versions().iter()
@@ -888,6 +888,7 @@ fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
         active = rotated.created().reference().clone();
         last_generation = rotated.evidence().generation();
         let after = f.snapshot();
+        assert!(after.generation() > before.generation());
         assert_eq!(after.active(), Some(&active));
         assert_eq!(
             after.versions().iter()
