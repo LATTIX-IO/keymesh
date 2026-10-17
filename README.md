@@ -8,9 +8,13 @@ Project website: https://lattix.io
 
 ## Status
 
-**Unreleased bootstrap.** The typed identity and URI contract APIs exist, but
-no cryptographic provider operation interface or backend is implemented yet. Public APIs will remain unstable until a deliberately approved
-release. The `keymesh` crate is explicitly **not publishable** at this stage.
+**Unreleased bootstrap.** Typed key identity/version, URI, crypto taxonomy,
+checked async provider operations, explicit capability-based provider routing,
+and bounded sensitive-material/credential callback contracts are implemented
+and tested using fake providers. No real cryptographic backend, live KMS/HSM,
+IAM system, independent assurance attestation or production credential store
+is included. Public APIs are not release-stable and the `keymesh` crate
+remains **non-publishable** until separate release approval.
 
 ## Security and key-versioning design (KM-01)
 
@@ -105,6 +109,36 @@ The example performs no key generation, cryptographic operation, KMS request,
 secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
+
+## KM-07: owned secret buffers and explicit credential callbacks
+
+`SecretBytes` and `KeyMaterial` accept ownership of bounded Rust Vec
+allocations and use RustCrypto `zeroize` on explicit erase and Drop.
+They cannot be implicitly cloned, serialized, formatted with Display or
+converted to raw slices; Debug is always redacted. A deliberately invoked
+`with_exposed` callback exposes a borrowed view only to trusted code
+(which can still deliberately copy bytes).
+
+The host-injected `CredentialAuthorization` and `CredentialSource`
+contracts require independent provider/namespace/operation agreement
+and explicit policy `Permit` **before** requesting a scoped credential.
+Denied/unknown/error decisions invoke zero credential callbacks; wrong
+returned scope/purpose or erased material is rejected. The library
+does not implement IAM, a credential store, key rotation, live crypto
+or OS-backed memory locking.
+
+**KM-05 continues to reject raw `OperationInput::KeyMaterial`**. The new
+wrapper does not enable unsafe import/wrap/export or substitute for the
+KM-05 mandatory cryptographic policy. KM-06 provider routing still
+rejects unverified HSM/custody claims and provider downgrade.
+
+Read [KM-07 sensitive material specification](docs/specs/sensitive-material-v1.md).
+Run the no-network consumer fixture:
+
+```sh
+cargo run --locked -p keymesh --example credential_boundary
+cargo test --workspace --all-features --locked
+```
 
 ## KM-06: explicit provider registration and capability routing
 

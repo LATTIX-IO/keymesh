@@ -1,6 +1,6 @@
 # Keymesh feature and conformance matrix
 
-Status: FOSS-404 / KM-05 pre-release API baseline. This matrix reports
+Status: FOSS-408 / KM-07 pre-release API baseline. This matrix reports
 **implemented code contracts**, not a certified security product.
 
 | Capability | Contract in Rust | Live provider implementation | Independent conformance |
@@ -17,7 +17,9 @@ Status: FOSS-404 / KM-05 pre-release API baseline. This matrix reports
 | Side-effect-free provider capability/resolve reads | KM-05 required trait contract | Fake only | Adapter author obligation |
 | Explicit provider registry / deterministic capability routing | KM-06, yes | Fake only | Scoped health/assurance, no fallback, removal races |
 | Native health probe, circuit breakers or physical revocation | Not implemented | No | KM-18 and provider adapters |
-| Credential broker / sensitive material ownership and zeroization | Not implemented | No | KM-07 planned |
+| Bounded move-only secret/key material and explicit zeroize-on-drop | KM-07 Rust-owned bytes | No live adapter | Bounds, erase, redaction and compile-fail doctests |
+| Host-approved provider/tenant/operation-scoped credential callbacks | KM-07 contract | Fake only | Denial/invalid-scope/mismatched-return regressions |
+| Production credential broker, OS locked memory and native key import | Not implemented | No | Subsequent adapter/security increments |
 | Software EdDSA/RSA/ECDSA primitives | Not implemented | No | KM-08 planned |
 | PKCS#11 hardware modules or cloud KMS integration | Not implemented | No | KM-14–17 planned |
 | Provider attestation and certified protection verification | Not implemented | No | Live validation needed |
@@ -36,5 +38,5 @@ verify real backend version/material selection and custody, and classify
 remote commit state accurately. The Rust host-assurance constructor and
 unverified provider capability catalog do not themselves attest any of these.
 
-Related: [KM-05 provider contract](provider-contract-v1.md),
+Related: [KM-07 secret boundary](sensitive-material-v1.md), [KM-05 provider contract](provider-contract-v1.md),
 [KM-04 capability schema](capabilities-v1.md), [Threat traceability](../security/traceability.md).
