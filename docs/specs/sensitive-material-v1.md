@@ -65,7 +65,9 @@ The checked acquisition routine processes requests as follows:
    invoking the credential source. Authorization must be a separate
    independently enforced decision, not a provider's self-reported claim.
 4. Revalidate configured source identity after await, then call
-   `CredentialSource::acquire` exactly once. No retry, logging of backend
+   `CredentialSource::acquire` exactly once. Any source error is normalized
+   to static `CredentialError::Unavailable`; callbacks cannot impersonate
+   policy denial or a host scope failure. No retry, logging of backend
    error contents, fallback provider or credential discovery is allowed.
 5. Match returned `ScopedCredential` scope, operation and purpose to
    the request, and reject empty/erased material. Wrong results are
