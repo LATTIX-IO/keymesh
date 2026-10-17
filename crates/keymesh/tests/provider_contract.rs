@@ -7,22 +7,18 @@ use keymesh::{
     PolicyContext, PolicyGate, PolicyVerdict, PreparedDispatch, ProtectionClass,
     ProtectionRequirement, ProviderCapabilities, ProviderError, ProviderErrorKind, ProviderFuture,
     ProviderInstanceId, ProviderNamespace, ProviderOutput, ProviderReply, ProviderResourceId,
-    ProviderVersionId, RequiredAssurance, ResolvedKey, RetryDisposition, SupportStatus,
+    ProviderVersionId, ResolvedKey, RetryDisposition, SupportStatus,
     VersionModel, VersionRequirement, execute_checked,
 };
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, Waker};
 
-struct NoopWake;
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
 fn block_on<F: Future>(future: F) -> F::Output {
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut cx = Context::from_waker(&waker);
+    let waker = Waker::noop();
+    let mut cx = Context::from_waker(waker);
     let mut future = Box::pin(future);
     loop {
         if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
@@ -528,8 +524,8 @@ fn dropping_pending_future_after_dispatch_does_not_confirm_cancellation() {
         },
     );
     let mut future = Box::pin(future);
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut cx = Context::from_waker(&waker);
+    let waker = Waker::noop();
+    let mut cx = Context::from_waker(waker);
     assert!(matches!(
         Pin::as_mut(&mut future).poll(&mut cx),
         Poll::Pending
