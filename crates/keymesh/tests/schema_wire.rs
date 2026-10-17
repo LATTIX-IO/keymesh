@@ -137,3 +137,39 @@ fn error_types_are_redacted_and_never_echo_credentials() {
     };
     assert!(!format!("{e:?} {e}").contains("PRIVATE_TOKEN_DO_NOT_ECHO"));
 }
+
+#[test]
+fn known_cryptographic_variants_reject_unknown_nested_fields() {
+    let extra_pss = json!({
+        "family": "rsa_pss",
+        "parameters": {
+            "modulus_bits":3072,
+            "digest":"sha256",
+            "mgf1_digest":"sha256",
+            "salt_bytes":32,
+            "restrict_to_hardware":true
+        }
+    });
+    assert!(serde_json::from_value::<AlgorithmProfile>(extra_pss).is_err());
+
+    let extra_digest = json!({
+        "type":"sign_digest",
+        "details":{"digest":"sha256","automatically_rehash":true}
+    });
+    assert!(serde_json::from_value::<CryptoOperation>(extra_digest).is_err());
+
+    let extra_payload = json!({
+        "form":"digest",
+        "parameters":{"algorithm":"sha256","bytes":32,"truncated":true}
+    });
+    assert!(serde_json::from_value::<PayloadDescriptor>(extra_payload).is_err());
+
+    let extra_hash_mode = json!({
+        "family":"ml_dsa",
+        "parameters":{"variant":"ml_dsa65","input":{
+            "mode":"hash_message",
+            "parameters":{"digest":"sha512","provider_auto_rehash":true}
+        }}
+    });
+    assert!(serde_json::from_value::<AlgorithmProfile>(extra_hash_mode).is_err());
+}
