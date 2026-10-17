@@ -1,7 +1,8 @@
 //! Provider-neutral key identity and pre-dispatch binding contracts.
 //!
-//! This initial API does **not** perform cryptographic operations or
-//! authenticate callers. It validates identifiers and proposed bindings. See
+//! Most of this API validates identity, policy and provider binding contracts.
+//! The explicit opt-in `software-provider` feature adds ephemeral Ed25519
+//! sign/verify, not production HSM/KMS or caller authentication. See
 //! `THREAT_MODEL.md` and ADR-0001/0002 in the repository for the trust model.
 
 #![forbid(unsafe_code)]
