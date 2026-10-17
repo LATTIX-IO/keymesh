@@ -332,6 +332,10 @@ impl PreparedDispatch<'_> {
     pub fn logical_key(&self) -> &LogicalKeyId {
         self.bound.logical_key()
     }
+    /// Provider-local revision from resolution, checked again after policy.
+    pub fn resolution_epoch(&self) -> Option<u64> {
+        self.bound.resolution_epoch()
+    }
     /// Preflight claimed assurance level, not independent attestation.
     pub fn assurance(&self) -> BindingAssurance {
         self.bound.assurance()
