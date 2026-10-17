@@ -367,10 +367,7 @@ impl ProviderCapabilities {
             | crate::algorithm::PayloadDescriptor::KeyMaterial { bytes } => bytes,
             crate::algorithm::PayloadDescriptor::Digest { bytes, .. }
             | crate::algorithm::PayloadDescriptor::ExternalMu { bytes } => u64::from(bytes),
-            crate::algorithm::PayloadDescriptor::Derivation {
-                info_bytes,
-                output_bytes,
-            } => info_bytes.saturating_add(output_bytes),
+            crate::algorithm::PayloadDescriptor::Derivation { info_bytes, .. } => info_bytes,
         };
         if bytes > 0 {
             match entry.max_input_bytes {
