@@ -622,7 +622,9 @@ fn unsupported_optional_provider_method_is_not_implicitly_fallbacked() {
     };
     t.intent.operation = op.clone();
     t.provider.catalog.entries[0].operation = op;
-    let signed = [0x05u8; 64];
+    // RSA-3072 requires 384 signature bytes; a malformed 64-byte proof
+    // is rejected *before* the optional method is evaluated.
+    let signed = [0x05u8; 384];
     let result = t.run_with(OperationInput::Digest {
         algorithm: DigestAlgorithm::Sha256,
         bytes: &t.message,
@@ -739,7 +741,7 @@ fn rsa_pss_verification_signature_must_match_exact_modulus_length() {
     };
     t.intent.operation = operation.clone();
     t.provider.catalog.entries[0].operation = operation;
-    let short_sig = vec![0x42; 64];
+    let short_sig = [0x42u8; 64];
     assert_pre_dispatch(
         t.run_with(OperationInput::Digest {
             algorithm: DigestAlgorithm::Sha256,
