@@ -22,7 +22,14 @@ use core::fmt;
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
 use std::collections::BTreeMap;
 use std::sync::RwLock;
+#[cfg(test)]
 use zeroize::Zeroizing;
+
+mod lifecycle;
+pub use lifecycle::{
+    SoftwareLogicalSnapshot, SoftwareLifecycleEvidence, SoftwareRotateRequest,
+    SoftwareTransitionAction, SoftwareTransitionRequest, SoftwareVersionSnapshot,
+};
 
 /// Hard cap on one pure-Ed25519 message accepted by software dispatch.
 pub const MAX_SOFTWARE_MESSAGE_BYTES: u64 = 1_048_576;
@@ -79,6 +86,14 @@ pub enum SoftwareLifecycleAction {
     Generate,
     /// Irreversibly discard exactly one live in-memory key and its seed.
     Purge,
+    /// Create a fresh independent provider version and retire the prior active version.
+    Rotate,
+    /// Disable an exact version, denying signing and historical verification.
+    Disable,
+    /// Re-enable one disabled exact version only while no active version exists.
+    Enable,
+    /// Mark an inactive version for explicit future deletion (no automatic timer).
+    ScheduleDelete,
 }
 
 /// Safe metadata sent to the required host-defined creation/deletion policy.
@@ -150,10 +165,39 @@ impl fmt::Debug for CreatedSoftwareKey {
     }
 }
 
+/// Current lifecycle status of one **immutable** software provider key version.
+/// Status can change, but resource/version identifiers and key material never do.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SoftwareVersionState {
+    /// The sole version currently permitted to sign this logical key.
+    Active,
+    /// No longer permitted to sign; exact-version verification remains possible.
+    Retired,
+    /// No sign, verify or public export is permitted.
+    Disabled,
+    /// Inactive, pending a separately authorized exact-version purge.
+    PendingDeletion,
+}
+
 struct StoredKey {
     target: DispatchTarget,
     public_key: [u8; 32],
     material: KeyMaterial,
+    status: SoftwareVersionState,
+    issued_order: u64,
+}
+
+struct LogicalRecord {
+    versions: BTreeMap<ProviderVersionId, StoredKey>,
+    active: Option<ProviderVersionId>,
+    latest: Option<ProviderVersionId>,
+    generation: u64,
+}
+#[derive(Default)]
+struct SoftwareState {
+    records: BTreeMap<LogicalKeyId, LogicalRecord>,
+    total_versions: usize,
+    next_generation: u64,
 }
 
 /// In-memory provider with a fixed exact provider instance and one namespace.
@@ -167,7 +211,7 @@ struct StoredKey {
 pub struct SoftwareProvider {
     instance: ProviderInstanceId,
     namespace: ProviderNamespace,
-    keys: RwLock<BTreeMap<LogicalKeyId, StoredKey>>,
+    keys: RwLock<SoftwareState>,
 }
 impl fmt::Debug for SoftwareProvider {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -182,7 +226,7 @@ impl SoftwareProvider {
         Self {
             instance,
             namespace,
-            keys: RwLock::new(BTreeMap::new()),
+            keys: RwLock::new(SoftwareState::default()),
         }
     }
 
@@ -199,159 +243,24 @@ impl SoftwareProvider {
         }
     }
 
-    /// Create exactly one key after a separate mandatory host policy Permit.
-    /// RNG and key allocation occur **after** all scope/profile/policy checks.
-    /// OS entropy failure is a no-dispatch error, not a success or fallback.
-    /// Duplicate logical keys fail; use KM-09 for version-safe rotation.
+    /// Create one initial version under a never-before-active logical name.
+    /// Existing KM-08 consumers continue to use this API unchanged.
     pub async fn create(
         &self,
         policy: &dyn SoftwareLifecycleGate,
         request: SoftwareCreateRequest<'_>,
     ) -> Result<CreatedSoftwareKey, ProviderError> {
-        if !valid_software_host(
-            &self.instance,
-            &self.namespace,
-            request.scope,
-            request.host_assurance,
-        ) {
-            return Err(denied(ProviderErrorKind::ScopeMismatch));
-        }
-        if request.intent != &Self::create_intent() || request.intent.validate().is_err() {
-            return Err(denied(ProviderErrorKind::UnsupportedOperationOrProfile));
-        }
-        {
-            let keys = self
-                .keys
-                .read()
-                .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            if keys.contains_key(request.logical_key) || keys.len() >= MAX_SOFTWARE_KEYS {
-                return Err(denied(ProviderErrorKind::InvalidInput));
-            }
-        }
-        let context = SoftwareLifecycleContext {
-            scope: request.scope,
-            logical_key: request.logical_key,
-            action: SoftwareLifecycleAction::Generate,
-            reference: None,
-        };
-        policy_result(policy.authorize(&context).await)?;
-
-        // Do not hold a std lock across a future; the lock below is acquired
-        // only after host policy. OS CSPRNG is the sole production entropy source.
-        let mut seed = Zeroizing::new(vec![0_u8; 32]);
-        getrandom::getrandom(&mut seed).map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        let mut nonce = Zeroizing::new([0_u8; 16]);
-        getrandom::getrandom(&mut *nonce).map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        let unique = lower_hex(&*nonce);
-        let resource = ProviderResourceId::parse(&format!("memory:ed25519:{unique}"))
-            .map_err(|_| denied(ProviderErrorKind::InvalidInput))?;
-        let version = ProviderVersionId::parse(&format!("v{unique}"))
-            .map_err(|_| denied(ProviderErrorKind::InvalidInput))?;
-        let public_key = {
-            let seed_bytes = <&[u8; 32]>::try_from(seed.as_slice())
-                .map_err(|_| denied(ProviderErrorKind::InvalidInput))?;
-            SigningKey::from_bytes(seed_bytes)
-                .verifying_key()
-                .to_bytes()
-        };
-        // Own one KeyMaterial; the scratch seed zeroizes independently at Drop.
-        let material = KeyMaterial::from_vec(std::mem::take(&mut *seed))
-            .map_err(|_| denied(ProviderErrorKind::InvalidInput))?;
-        let target = DispatchTarget::ProviderVersion {
-            resource: resource.clone(),
-            version: version.clone(),
-        };
-        let mut keys = self
-            .keys
-            .write()
-            .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        if keys.contains_key(request.logical_key) || keys.len() >= MAX_SOFTWARE_KEYS {
-            return Err(denied(ProviderErrorKind::InvalidInput));
-        }
-        keys.insert(
-            request.logical_key.clone(),
-            StoredKey {
-                target,
-                public_key,
-                material,
-            },
-        );
-        Ok(CreatedSoftwareKey {
-            reference: KeyRef::new(
-                self.instance.clone(),
-                self.namespace.clone(),
-                request.logical_key.clone(),
-                KeySelector::ExactProviderVersion { resource, version },
-            ),
-            public_key,
-        })
+        self.create_initial(policy, request).await
     }
 
-    /// Purge exactly the currently pinned key after host lifecycle policy.
-    /// No alias is accepted and no other provider/tenant is modified.
-    /// The stored KeyMaterial is zeroized by Drop after removal. A concurrent
-    /// sign either finishes before purge or fails because its target vanished.
-    /// A purge does not prove erasure of OS memory or downstream copies.
+    /// Purge the exact version after an independent lifecycle Permit.
+    /// Unlike a mutable logical alias, the reference cannot change targets.
     pub async fn purge(
         &self,
         policy: &dyn SoftwareLifecycleGate,
         request: SoftwarePurgeRequest<'_>,
     ) -> Result<(), ProviderError> {
-        if !valid_software_host(
-            &self.instance,
-            &self.namespace,
-            request.scope,
-            request.host_assurance,
-        ) || request.reference.provider() != &self.instance
-            || request.reference.namespace() != &self.namespace
-        {
-            return Err(denied(ProviderErrorKind::ScopeMismatch));
-        }
-        let (resource, version) = match request.reference.selector() {
-            KeySelector::ExactProviderVersion { resource, version } => (resource, version),
-            _ => return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
-        };
-        {
-            let keys = self
-                .keys
-                .read()
-                .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let key = keys
-                .get(request.reference.logical_key())
-                .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if key.target
-                != (DispatchTarget::ProviderVersion {
-                    resource: resource.clone(),
-                    version: version.clone(),
-                })
-            {
-                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
-            }
-        }
-        let context = SoftwareLifecycleContext {
-            scope: request.scope,
-            logical_key: request.reference.logical_key(),
-            action: SoftwareLifecycleAction::Purge,
-            reference: Some(request.reference),
-        };
-        policy_result(policy.authorize(&context).await)?;
-        let mut keys = self
-            .keys
-            .write()
-            .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-        let stored = keys
-            .get(request.reference.logical_key())
-            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        if stored.target
-            != (DispatchTarget::ProviderVersion {
-                resource: resource.clone(),
-                version: version.clone(),
-            })
-        {
-            return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
-        }
-        keys.remove(request.reference.logical_key());
-        Ok(())
+        self.purge_exact(policy, request).await
     }
 
     fn matches_scope(&self, scope: &HostScope) -> bool {
@@ -361,7 +270,7 @@ impl SoftwareProvider {
     fn checked_entry<'a>(
         &'a self,
         request: &PreparedDispatch<'_>,
-        keys: &'a BTreeMap<LogicalKeyId, StoredKey>,
+        keys: &'a SoftwareState,
     ) -> Result<&'a StoredKey, ProviderError> {
         if request.provider() != &self.instance || request.namespace() != &self.namespace {
             return Err(denied(ProviderErrorKind::ScopeMismatch));
@@ -369,15 +278,33 @@ impl SoftwareProvider {
         if request.feature_revision() != REVISION || request.protocol_revision() != PROTOCOL {
             return Err(denied(ProviderErrorKind::UnverifiedCapability));
         }
-        let entry = keys
-            .get(request.logical_key())
+        let record = keys.records.get(request.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        if &entry.target != request.target()
-            || !matches!(entry.target, DispatchTarget::ProviderVersion { .. })
-        {
+        let version = request.target().provider_version()
+            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+        let entry = record.versions.get(version)
+            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+        if &entry.target != request.target() {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
         }
-        Ok(entry)
+        // An Active or Latest alias resolved BEFORE policy evaluation is a
+        // pinned target, not an authorization to follow a future rotation.
+        match request.requested_selector() {
+            KeySelector::Active if record.active.as_ref() != Some(version) =>
+                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
+            KeySelector::Latest if record.latest.as_ref() != Some(version) =>
+                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
+            _ => {}
+        }
+        match request.intent().operation {
+            CryptoOperation::SignMessage
+                if entry.status == SoftwareVersionState::Active
+                    && record.active.as_ref() == Some(version) => Ok(entry),
+            CryptoOperation::VerifyMessage | CryptoOperation::ExportPublic
+                if matches!(entry.status, SoftwareVersionState::Active | SoftwareVersionState::Retired) =>
+                    Ok(entry),
+            _ => Err(denied(ProviderErrorKind::AuthorizationDenied)),
+        }
     }
 
     fn operation_valid(request: &PreparedDispatch<'_>, desired: CryptoOperation) -> bool {
@@ -445,24 +372,26 @@ impl KeyProvider for SoftwareProvider {
             {
                 return Err(denied(ProviderErrorKind::ScopeMismatch));
             }
-            let (resource, version) = match reference.selector() {
-                KeySelector::ExactProviderVersion { resource, version } => (resource, version),
-                _ => return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
-            };
-            let keys = self
-                .keys
-                .read()
+            let keys = self.keys.read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let key = keys
-                .get(reference.logical_key())
+            let record = keys.records.get(reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            if key.target
-                != (DispatchTarget::ProviderVersion {
-                    resource: resource.clone(),
-                    version: version.clone(),
-                })
-            {
-                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
+            let version = match reference.selector() {
+                KeySelector::Active => record.active.as_ref(),
+                KeySelector::Latest => record.latest.as_ref(),
+                KeySelector::ExactProviderVersion { version, .. } => Some(version),
+                _ => None,
+            }
+            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+            let key = record.versions.get(version)
+                .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+            if let KeySelector::ExactProviderVersion { resource, .. } = reference.selector() {
+                if key.target.resource() != resource {
+                    return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
+                }
+            }
+            if !matches!(key.status, SoftwareVersionState::Active | SoftwareVersionState::Retired) {
+                return Err(denied(ProviderErrorKind::AuthorizationDenied));
             }
             Ok(ResolvedKey::new(
                 self.instance.clone(),
