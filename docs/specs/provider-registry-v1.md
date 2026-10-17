@@ -62,9 +62,13 @@ lifecycle mutation. There is no automatic network discovery or live adapter
 bootstrap.
 
 `RouteTrace` reports only counts by static rejection reason (scoped mismatch,
-deregistered, unhealthy, read error, capability mismatch, assurance mismatch);
-ordinary Debug on routed selections and registry instances redacts provider,
-namespace and private paths. The application must treat the explicit
+deregistered, unhealthy, read error, capability mismatch, assurance mismatch).
+The optional `route_diagnostic` API returns `RoutingFailure` with the same
+bounded trace on failure; `route` keeps its simpler static error enum.
+Candidate enumeration and diagnostic counts include **only** host-approved
+provider+tenant scopes; the existence of other tenants/providers is not
+disclosed through routing statistics. Ordinary Debug on routed selections
+and registry instances redacts provider, namespace and private paths. The application must treat the explicit
 `RoutedProvider::instance` accessor as audit metadata requiring suitable
 access controls.
 
