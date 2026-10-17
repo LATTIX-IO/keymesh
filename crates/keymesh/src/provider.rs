@@ -78,6 +78,9 @@ pub struct ProviderError {
 impl ProviderError {
     /// Adapter is certain an operation was not dispatched.
     pub const fn not_dispatched(kind: ProviderErrorKind) -> Self {
+        if matches!(kind, ProviderErrorKind::UnknownCommitState) {
+            return Self::unknown_commit_state();
+        }
         Self {
             kind,
             state: OperationState::NotDispatched,
@@ -85,6 +88,9 @@ impl ProviderError {
     }
     /// Provider positively confirmed a failure without remote commit.
     pub const fn confirmed_failure(kind: ProviderErrorKind) -> Self {
+        if matches!(kind, ProviderErrorKind::UnknownCommitState) {
+            return Self::unknown_commit_state();
+        }
         Self {
             kind,
             state: OperationState::ConfirmedFailure,
