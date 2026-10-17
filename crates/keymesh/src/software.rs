@@ -289,6 +289,11 @@ impl SoftwareProvider {
         }
         let record = keys.records.get(request.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+        // Invalidate dispatch when lifecycle state changed during policy,
+        // including Disable -> Enable on the same exact version.
+        if request.resolution_epoch() != Some(record.generation) {
+            return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
+        }
         let version = request.target().provider_version()
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         let entry = record.versions.get(version)
@@ -407,7 +412,7 @@ impl KeyProvider for SoftwareProvider {
                 self.namespace.clone(),
                 reference.logical_key().clone(),
                 key.target.clone(),
-            ))
+            ).with_resolution_epoch(record.generation))
         })
     }
 
