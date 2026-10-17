@@ -840,3 +840,60 @@ fn latest_alias_verification_does_not_switch_versions_during_policy_wait() {
     assert!(f.verified(original.reference(), b"abc", &signed)
         .unwrap_or_else(|e| panic!("{e}")));
 }
+
+
+#[test]
+fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
+    let f = Fixture::new();
+    let first = f.create();
+    let mut active = first.reference().clone();
+    let mut last_generation = 0_u64;
+    for step in 0..12 {
+        let before = f.snapshot();
+        assert!(before.generation() > last_generation);
+        assert!(before.versions().len() <= MAX_SOFTWARE_VERSIONS_PER_KEY);
+        assert_eq!(
+            before.versions().iter()
+                .filter(|v| v.status() == SoftwareVersionState::Active).count(),
+            1,
+        );
+        assert_eq!(before.active(), Some(&active));
+        for (index, version) in before.versions().iter().enumerate() {
+            assert!(before.versions().iter().skip(index + 1)
+                .all(|other| version.reference() != other.reference()));
+        }
+        // Every fourth iteration exercises a stop/restart transition.
+        if step % 4 == 0 {
+            let disabled = f.transition(
+                &active, before.generation(),
+                SoftwareTransitionAction::Disable, &f.permit,
+            ).unwrap_or_else(|e| panic!("{e}"));
+            assert!(f.snapshot().active().is_none());
+            let enabled = f.transition(
+                &active, disabled.generation(),
+                SoftwareTransitionAction::Enable, &f.permit,
+            ).unwrap_or_else(|e| panic!("{e}"));
+            assert_eq!(f.snapshot().active(), Some(&active));
+            assert!(enabled.generation() > disabled.generation());
+        }
+        let signature = f.signature(&active, b"historic")
+            .unwrap_or_else(|e| panic!("{e}"));
+        let current_generation = f.snapshot().generation();
+        let rotated = f.rotate(&active, current_generation, &f.permit)
+            .unwrap_or_else(|e| panic!("{e}"));
+        assert!(f.verified(&active, b"historic", &signature)
+            .unwrap_or_else(|e| panic!("{e}")));
+        rejected(f.signature(&active, b"no longer active"),
+            ProviderErrorKind::AuthorizationDenied);
+        active = rotated.created().reference().clone();
+        last_generation = rotated.evidence().generation();
+        let after = f.snapshot();
+        assert_eq!(after.active(), Some(&active));
+        assert_eq!(
+            after.versions().iter()
+                .filter(|v| v.status() == SoftwareVersionState::Active).count(),
+            1,
+        );
+    }
+    assert_eq!(f.snapshot().versions().len(), 13);
+}
