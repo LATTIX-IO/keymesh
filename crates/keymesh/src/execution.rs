@@ -41,8 +41,7 @@ pub struct PolicyContext<'a> {
 /// Calling this trait does not authenticate the host or prove policy freshness.
 pub trait PolicyGate: Send + Sync {
     /// Return permit/deny/indeterminate, with no provider crypto side effects.
-    fn evaluate<'a>(&'a self, context: &'a PolicyContext<'_>)
-        -> ProviderFuture<'a, PolicyVerdict>;
+    fn evaluate<'a>(&'a self, context: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyVerdict>;
 }
 
 /// Borrowed and deliberately non-Debug operation input. Secret-bearing bytes
@@ -89,7 +88,10 @@ pub enum OperationInput<'a> {
 impl OperationInput<'_> {
     /// Classify actual bytes into KM-04 payload metadata and check whether
     /// authenticator/signature is present only for verify operations.
-    pub fn classify(&self, operation: &CryptoOperation) -> Result<PayloadDescriptor, ProviderError> {
+    pub fn classify(
+        &self,
+        operation: &CryptoOperation,
+    ) -> Result<PayloadDescriptor, ProviderError> {
         use CryptoOperation as O;
         let requires_proof = matches!(
             operation,
@@ -105,22 +107,47 @@ impl OperationInput<'_> {
         let invalid = || ProviderError::not_dispatched(ProviderErrorKind::InvalidInput);
         match self {
             Self::None => Ok(PayloadDescriptor::None),
-            Self::Message { bytes, authenticator } => {
-                if !proof_ok(authenticator) { return Err(invalid()); }
-                Ok(PayloadDescriptor::Message { bytes: bytes.len() as u64 })
+            Self::Message {
+                bytes,
+                authenticator,
+            } => {
+                if !proof_ok(authenticator) {
+                    return Err(invalid());
+                }
+                Ok(PayloadDescriptor::Message {
+                    bytes: bytes.len() as u64,
+                })
             }
-            Self::Digest { algorithm, bytes, authenticator } => {
-                if !proof_ok(authenticator) { return Err(invalid()); }
+            Self::Digest {
+                algorithm,
+                bytes,
+                authenticator,
+            } => {
+                if !proof_ok(authenticator) {
+                    return Err(invalid());
+                }
                 let len = u16::try_from(bytes.len()).map_err(|_| invalid())?;
-                Ok(PayloadDescriptor::Digest { algorithm: *algorithm, bytes: len })
+                Ok(PayloadDescriptor::Digest {
+                    algorithm: *algorithm,
+                    bytes: len,
+                })
             }
-            Self::ExternalMu { bytes, authenticator } => {
-                if !proof_ok(authenticator) { return Err(invalid()); }
+            Self::ExternalMu {
+                bytes,
+                authenticator,
+            } => {
+                if !proof_ok(authenticator) {
+                    return Err(invalid());
+                }
                 let len = u16::try_from(bytes.len()).map_err(|_| invalid())?;
                 Ok(PayloadDescriptor::ExternalMu { bytes: len })
             }
-            Self::Ciphertext(bytes) => Ok(PayloadDescriptor::Ciphertext { bytes: bytes.len() as u64 }),
-            Self::KeyMaterial(bytes) => Ok(PayloadDescriptor::KeyMaterial { bytes: bytes.len() as u64 }),
+            Self::Ciphertext(bytes) => Ok(PayloadDescriptor::Ciphertext {
+                bytes: bytes.len() as u64,
+            }),
+            Self::KeyMaterial(bytes) => Ok(PayloadDescriptor::KeyMaterial {
+                bytes: bytes.len() as u64,
+            }),
             Self::Derivation { info, output_bytes } => Ok(PayloadDescriptor::Derivation {
                 info_bytes: info.len() as u64,
                 output_bytes: *output_bytes,
@@ -200,7 +227,9 @@ fn map_capability(error: CapabilityError) -> ProviderError {
         C::UnverifiedVersion => ProviderErrorKind::UnsupportedVersionAssurance,
         C::UnverifiedProtection => ProviderErrorKind::UnverifiedCapability,
         C::ExportNotPermitted => ProviderErrorKind::AuthorizationDenied,
-        C::MissingCapability | C::UnsupportedCapability | C::UnknownCapability
+        C::MissingCapability
+        | C::UnsupportedCapability
+        | C::UnknownCapability
         | C::ExtensionNotPermitted => ProviderErrorKind::UnsupportedOperationOrProfile,
         C::PayloadLimitUnknown | C::PayloadTooLarge => ProviderErrorKind::InvalidInput,
     };
@@ -208,11 +237,13 @@ fn map_capability(error: CapabilityError) -> ProviderError {
 }
 fn map_binding(error: BindingError) -> ProviderError {
     let kind = match error {
-        BindingError::UnsupportedVersionAssurance | BindingError::VersionMismatch
+        BindingError::UnsupportedVersionAssurance
+        | BindingError::VersionMismatch
         | BindingError::MaterialRevisionMismatch => ProviderErrorKind::UnsupportedVersionAssurance,
-        BindingError::ProviderMismatch | BindingError::NamespaceMismatch
-        | BindingError::ResourceMismatch | BindingError::LogicalKeyMismatch =>
-            ProviderErrorKind::ScopeMismatch,
+        BindingError::ProviderMismatch
+        | BindingError::NamespaceMismatch
+        | BindingError::ResourceMismatch
+        | BindingError::LogicalKeyMismatch => ProviderErrorKind::ScopeMismatch,
     };
     ProviderError::not_dispatched(kind)
 }
@@ -220,7 +251,10 @@ fn map_profile(_error: ProfileError) -> ProviderError {
     ProviderError::not_dispatched(ProviderErrorKind::InvalidInput)
 }
 fn is_creation(operation: &CryptoOperation) -> bool {
-    matches!(operation, CryptoOperation::Generate | CryptoOperation::Import)
+    matches!(
+        operation,
+        CryptoOperation::Generate | CryptoOperation::Import
+    )
 }
 fn is_destructive(operation: &CryptoOperation) -> bool {
     matches!(
@@ -262,10 +296,14 @@ pub async fn execute_checked(
         || request.reference.provider() != request.scope.provider()
         || request.reference.namespace() != request.scope.namespace()
     {
-        return Err(ProviderError::not_dispatched(ProviderErrorKind::ScopeMismatch));
+        return Err(ProviderError::not_dispatched(
+            ProviderErrorKind::ScopeMismatch,
+        ));
     }
     if request.host_assurance.scope.as_ref() != Some(request.scope) {
-        return Err(ProviderError::not_dispatched(ProviderErrorKind::ScopeMismatch));
+        return Err(ProviderError::not_dispatched(
+            ProviderErrorKind::ScopeMismatch,
+        ));
     }
     request.intent.validate().map_err(map_profile)?;
     let actual = request.input.classify(&request.intent.operation)?;
@@ -277,21 +315,26 @@ pub async fn execute_checked(
     // a safe creation/secret ownership contract; do not forge a BoundKey.
     if is_creation(&request.intent.operation) {
         return Err(ProviderError::not_dispatched(
-            ProviderErrorKind::UnsupportedOperationOrProfile
+            ProviderErrorKind::UnsupportedOperationOrProfile,
         ));
     }
     if is_destructive(&request.intent.operation)
-        && matches!(request.reference.selector(), crate::KeySelector::Active | crate::KeySelector::Latest)
+        && matches!(
+            request.reference.selector(),
+            crate::KeySelector::Active | crate::KeySelector::Latest
+        )
     {
         return Err(invalid());
     }
     // AES-GCM requires nonce/AAD/tag-specific request types and nonce
     // uniqueness guarantees. No such adapter boundary exists in KM-05.
-    if matches!(request.intent.profile, crate::AlgorithmProfile::AesGcm { .. })
-        && matches!(request.intent.operation, O::Encrypt | O::Decrypt)
+    if matches!(
+        request.intent.profile,
+        crate::AlgorithmProfile::AesGcm { .. }
+    ) && matches!(request.intent.operation, O::Encrypt | O::Decrypt)
     {
         return Err(ProviderError::not_dispatched(
-            ProviderErrorKind::UnsupportedOperationOrProfile
+            ProviderErrorKind::UnsupportedOperationOrProfile,
         ));
     }
 
@@ -301,8 +344,12 @@ pub async fn execute_checked(
         .map_err(map_capability)?;
     let resolved = provider.resolve(request.scope, request.reference).await?;
     let bound = preflight_bind(
-        request.reference, request.scope, &resolved, request.intent.binding.binding()
-    ).map_err(map_binding)?;
+        request.reference,
+        request.scope,
+        &resolved,
+        request.intent.binding.binding(),
+    )
+    .map_err(map_binding)?;
 
     let ctx = PolicyContext {
         scope: request.scope,
@@ -313,10 +360,16 @@ pub async fn execute_checked(
     };
     match policy.evaluate(&ctx).await {
         Ok(PolicyVerdict::Permit) => {}
-        Ok(PolicyVerdict::Deny) =>
-            return Err(ProviderError::not_dispatched(ProviderErrorKind::PolicyDenied)),
-        Ok(PolicyVerdict::Indeterminate) | Err(_) =>
-            return Err(ProviderError::not_dispatched(ProviderErrorKind::PolicyIndeterminate)),
+        Ok(PolicyVerdict::Deny) => {
+            return Err(ProviderError::not_dispatched(
+                ProviderErrorKind::PolicyDenied,
+            ));
+        }
+        Ok(PolicyVerdict::Indeterminate) | Err(_) => {
+            return Err(ProviderError::not_dispatched(
+                ProviderErrorKind::PolicyIndeterminate,
+            ));
+        }
     }
 
     let prepared = PreparedDispatch {
@@ -327,30 +380,30 @@ pub async fn execute_checked(
     };
     // The only operation dispatch point. No generic implicit provider fallback.
     let reply: ProviderReply = match &request.intent.operation {
-        O::SignMessage | O::SignDigest { .. } | O::SignExternalMu =>
-            provider.sign(&prepared, &request.input).await?,
-        O::VerifyMessage | O::VerifyDigest { .. } | O::VerifyExternalMu =>
-            provider.verify(&prepared, &request.input).await?,
+        O::SignMessage | O::SignDigest { .. } | O::SignExternalMu => {
+            provider.sign(&prepared, &request.input).await?
+        }
+        O::VerifyMessage | O::VerifyDigest { .. } | O::VerifyExternalMu => {
+            provider.verify(&prepared, &request.input).await?
+        }
         O::Encrypt => provider.encrypt(&prepared, &request.input).await?,
         O::Decrypt => provider.decrypt(&prepared, &request.input).await?,
         O::WrapKey => provider.wrap_key(&prepared, &request.input).await?,
         O::UnwrapKey => provider.unwrap_key(&prepared, &request.input).await?,
-        O::MacMessage | O::VerifyMacMessage =>
-            provider.mac(&prepared, &request.input).await?,
-        O::Encapsulate | O::Decapsulate =>
-            provider.kem(&prepared, &request.input).await?,
+        O::MacMessage | O::VerifyMacMessage => provider.mac(&prepared, &request.input).await?,
+        O::Encapsulate | O::Decapsulate => provider.kem(&prepared, &request.input).await?,
         O::DeriveKey => provider.derive_key(&prepared, &request.input).await?,
-        O::Extension { .. } =>
+        O::Extension { .. } => {
             return Err(ProviderError::not_dispatched(
-                ProviderErrorKind::UnsupportedOperationOrProfile
-            )),
+                ProviderErrorKind::UnsupportedOperationOrProfile,
+            ));
+        }
         _ => provider.lifecycle(&prepared, &request.input).await?,
     };
     let (observed_target, output, provider_request_id) = reply.into_parts();
     // A bad receipt arrives *after* possible remote side effects: never
     // return NotDispatched or blindly retry a side-effecting operation.
-    if observed_target != *prepared.target()
-        || !output.matches_operation(&request.intent.operation)
+    if observed_target != *prepared.target() || !output.matches_operation(&request.intent.operation)
     {
         return Err(ProviderError::unknown_commit_state());
     }
