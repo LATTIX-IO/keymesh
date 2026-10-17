@@ -125,7 +125,11 @@ pub struct RouteTrace {
 }
 impl RouteTrace {
     fn new() -> Self {
-        Self { examined: 0, rejected: 0, reason_counts: [0; 6] }
+        Self {
+            examined: 0,
+            rejected: 0,
+            reason_counts: [0; 6],
+        }
     }
     fn reject(&mut self, reason: RejectionReason) {
         self.rejected += 1;
@@ -185,7 +189,9 @@ struct Registration {
     health: AtomicU8,
 }
 impl Registration {
-    fn is_live(&self) -> bool { self.active.load(Ordering::Acquire) }
+    fn is_live(&self) -> bool {
+        self.active.load(Ordering::Acquire)
+    }
     fn health(&self) -> ProviderHealth {
         ProviderHealth::decode(self.health.load(Ordering::Acquire))
     }
@@ -209,7 +215,9 @@ impl fmt::Debug for ProviderRegistry {
 }
 impl ProviderRegistry {
     /// Create an empty registry; there is no global provider default.
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     /// Enroll a host-approved provider/tenant scope. A registration represents
     /// exactly one independently approved scope for this ProviderInstanceId.
@@ -224,7 +232,10 @@ impl ProviderRegistry {
         if provider.instance() != scope.provider() || host.scope.as_ref() != Some(&scope) {
             return Err(RegistrationError::ScopeMismatch);
         }
-        let mut state = self.inner.write().map_err(|_| RegistrationError::RegistryUnavailable)?;
+        let mut state = self
+            .inner
+            .write()
+            .map_err(|_| RegistrationError::RegistryUnavailable)?;
         if state.entries.contains_key(scope.provider()) {
             return Err(RegistrationError::DuplicateInstance);
         }
@@ -247,10 +258,18 @@ impl ProviderRegistry {
     /// Change health only for the exact registered provider/tenant. An Unknown
     /// status never authorizes dispatch, and this is a host assertion only.
     pub fn set_health(
-        &self, scope: &HostScope, status: ProviderHealth,
+        &self,
+        scope: &HostScope,
+        status: ProviderHealth,
     ) -> Result<(), RegistrationError> {
-        let state = self.inner.read().map_err(|_| RegistrationError::RegistryUnavailable)?;
-        let entry = state.entries.get(scope.provider()).ok_or(RegistrationError::NotRegistered)?;
+        let state = self
+            .inner
+            .read()
+            .map_err(|_| RegistrationError::RegistryUnavailable)?;
+        let entry = state
+            .entries
+            .get(scope.provider())
+            .ok_or(RegistrationError::NotRegistered)?;
         if &entry.scope != scope || !entry.is_live() {
             return Err(RegistrationError::ScopeMismatch);
         }
@@ -262,9 +281,17 @@ impl ProviderRegistry {
     /// the revoked flag before successful handoff. Existing native operations
     /// already dispatched CANNOT be rolled back by deregistration.
     pub fn unregister(&self, scope: &HostScope) -> Result<(), RegistrationError> {
-        let mut state = self.inner.write().map_err(|_| RegistrationError::RegistryUnavailable)?;
-        let entry = state.entries.get(scope.provider()).ok_or(RegistrationError::NotRegistered)?;
-        if &entry.scope != scope { return Err(RegistrationError::ScopeMismatch); }
+        let mut state = self
+            .inner
+            .write()
+            .map_err(|_| RegistrationError::RegistryUnavailable)?;
+        let entry = state
+            .entries
+            .get(scope.provider())
+            .ok_or(RegistrationError::NotRegistered)?;
+        if &entry.scope != scope {
+            return Err(RegistrationError::ScopeMismatch);
+        }
         entry.active.store(false, Ordering::Release);
         state.entries.remove(scope.provider());
         Ok(())
@@ -274,24 +301,41 @@ impl ProviderRegistry {
     /// called here. Candidate order is deterministic by ProviderInstanceId.
     /// An unavailable explicit instance NEVER falls back to AnyCompatible.
     pub async fn route(
-        &self, requirements: ProviderRequirements<'_>,
+        &self,
+        requirements: ProviderRequirements<'_>,
     ) -> Result<RoutedProvider, RouteError> {
-        requirements.intent.validate().map_err(|_| RouteError::InvalidRequirements)?;
+        requirements
+            .intent
+            .validate()
+            .map_err(|_| RouteError::InvalidRequirements)?;
         // Every provider is independently authorized for the same tenant.
         // A caller cannot substitute a different tenant during AnyCompatible.
         let Some(first) = requirements.authorized_scopes.first() else {
             return Err(RouteError::InvalidRequirements);
         };
         if requirements.authorized_scopes.len() > MAX_REGISTERED_PROVIDERS
-            || requirements.authorized_scopes.iter().any(|scope| scope.namespace() != first.namespace())
+            || requirements
+                .authorized_scopes
+                .iter()
+                .any(|scope| scope.namespace() != first.namespace())
         {
             return Err(RouteError::InvalidRequirements);
         }
         let candidates = {
-            let state = self.inner.read().map_err(|_| RouteError::RegistryUnavailable)?;
+            let state = self
+                .inner
+                .read()
+                .map_err(|_| RouteError::RegistryUnavailable)?;
             match requirements.selection {
-                ProviderSelection::Instance(id) => state.entries.get(id).cloned().into_iter().collect::<Vec<_>>(),
-                ProviderSelection::AnyCompatible => state.entries.values().cloned().collect::<Vec<_>>(),
+                ProviderSelection::Instance(id) => state
+                    .entries
+                    .get(id)
+                    .cloned()
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                ProviderSelection::AnyCompatible => {
+                    state.entries.values().cloned().collect::<Vec<_>>()
+                }
             }
         };
         let mut trace = RouteTrace::new();
@@ -301,7 +345,10 @@ impl ProviderRegistry {
                 trace.reject(RejectionReason::Deregistered);
                 continue;
             }
-            if !requirements.authorized_scopes.iter().any(|authorized| authorized == &entry.scope)
+            if !requirements
+                .authorized_scopes
+                .iter()
+                .any(|authorized| authorized == &entry.scope)
                 || entry.provider.instance() != entry.scope.provider()
                 || entry.host.scope.as_ref() != Some(&entry.scope)
             {
@@ -370,16 +417,24 @@ impl fmt::Debug for RoutedProvider {
 impl RoutedProvider {
     /// Provider name selected by deterministic capability matching (safe only
     /// in permissioned audit contexts; Debug intentionally redacts it).
-    pub fn instance(&self) -> &ProviderInstanceId { self.entry.scope.provider() }
+    pub fn instance(&self) -> &ProviderInstanceId {
+        self.entry.scope.provider()
+    }
 
     /// Tenant namespace selected by host authority, not untrusted caller data.
-    pub fn namespace(&self) -> &ProviderNamespace { self.entry.scope.namespace() }
+    pub fn namespace(&self) -> &ProviderNamespace {
+        self.entry.scope.namespace()
+    }
 
     /// Accepted exact algorithm/operation entry.
-    pub fn admission(&self) -> &Admission { &self.admission }
+    pub fn admission(&self) -> &Admission {
+        &self.admission
+    }
 
     /// Sanitized, bounded summary of selection criteria.
-    pub fn trace(&self) -> &RouteTrace { &self.trace }
+    pub fn trace(&self) -> &RouteTrace {
+        &self.trace
+    }
 
     /// Check the registration lease immediately before a new operation. A
     /// revoked route is never a valid authority after unregister.
@@ -410,7 +465,10 @@ impl RoutedProvider {
         {
             return Err(denied());
         }
-        let guard = RegistryPolicy { inner: policy, entry: &self.entry };
+        let guard = RegistryPolicy {
+            inner: policy,
+            entry: &self.entry,
+        };
         execute_checked(self.entry.provider.as_ref(), &guard, request).await
     }
 }
@@ -419,9 +477,7 @@ struct RegistryPolicy<'a> {
     entry: &'a Registration,
 }
 impl PolicyGate for RegistryPolicy<'_> {
-    fn evaluate<'a>(&'a self, ctx: &'a PolicyContext<'_>)
-        -> ProviderFuture<'a, PolicyVerdict>
-    {
+    fn evaluate<'a>(&'a self, ctx: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyVerdict> {
         Box::pin(async move {
             if !self.entry.is_live() || self.entry.health() != ProviderHealth::Healthy {
                 return Ok(PolicyVerdict::Indeterminate);
