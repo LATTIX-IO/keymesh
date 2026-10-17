@@ -325,7 +325,9 @@ impl ProviderRegistry {
         &self,
         requirements: ProviderRequirements<'_>,
     ) -> Result<RoutedProvider, RouteError> {
-        self.route_diagnostic(requirements).await.map_err(|failure| failure.kind)
+        self.route_diagnostic(requirements)
+            .await
+            .map_err(|failure| failure.kind)
     }
 
     /// Like route(), but also returns a bounded, redacted rejection summary
