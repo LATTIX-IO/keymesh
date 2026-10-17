@@ -7,6 +7,8 @@ use crate::algorithm::{
     AlgorithmProfile, CryptoOperation, ExportRequirement, OperationIntent, ProfileError,
     ProtectionRequirement, VersionRequirement,
 };
+use crate::binding::HostScope;
+use crate::identity::{ProviderInstanceId, ProviderNamespace};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -134,6 +136,10 @@ pub struct CapabilityEntry {
 pub struct ProviderCapabilities {
     /// Must match CAPABILITY_SCHEMA_VERSION.
     pub schema_version: u16,
+    /// Provider instance associated with this specific report (not self-authenticating).
+    pub provider_instance: String,
+    /// Tenant/account/partition namespace associated with this specific report.
+    pub namespace: String,
     /// Provider protocol name/version, bounded printable metadata only.
     pub protocol_revision: String,
     /// Provider feature revision or generation; distinct from key version.
@@ -153,8 +159,10 @@ pub struct ProviderCapabilities {
 /// Host-asserted, independently established capabilities. Creating this
 /// struct does not authenticate a caller or verify an attestation: only a
 /// trusted host boundary may populate it after its own verification.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct HostValidatedCapabilities {
+    /// Host-approved provider and namespace; must not come from the reported catalog.
+    pub scope: Option<HostScope>,
     /// Custody evidence independently verified by the host.
     pub protection: Option<ProtectionClass>,
     /// Version semantics independently corroborated by provider-specific tests.
@@ -202,6 +210,8 @@ pub enum CapabilityError {
     ExportNotPermitted,
     /// Nonstandard extension requires explicit host opt-in.
     ExtensionNotPermitted,
+    /// Capability report or host assurance belongs to a different provider/tenant.
+    ScopeMismatch,
 }
 impl std::fmt::Display for CapabilityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -218,6 +228,7 @@ impl std::fmt::Display for CapabilityError {
             Self::UnverifiedVersion => "required version selectability is unverified",
             Self::ExportNotPermitted => "key export capability or approval missing",
             Self::ExtensionNotPermitted => "extension not authorized",
+            Self::ScopeMismatch => "provider capability scope mismatch",
         };
         f.write_str(s)
     }
@@ -253,6 +264,8 @@ impl ProviderCapabilities {
     /// Reject malformed, oversized, or ambiguous provider metadata.
     pub fn validate(&self) -> Result<(), CapabilityError> {
         if self.schema_version != CAPABILITY_SCHEMA_VERSION
+            || ProviderInstanceId::parse(&self.provider_instance).is_err()
+            || ProviderNamespace::parse(&self.namespace).is_err()
             || !revision_safe(&self.protocol_revision)
             || !revision_safe(&self.feature_revision)
             || self.entries.len() > MAX_CAPABILITY_ENTRIES
@@ -292,6 +305,14 @@ impl ProviderCapabilities {
         host: &HostValidatedCapabilities,
     ) -> Result<Admission, CapabilityError> {
         self.validate()?;
+        // A valid catalog is only data. Host corroboration MUST be bound to
+        // the very same instance and namespace, not reusable across providers.
+        let scope = host.scope.as_ref().ok_or(CapabilityError::ScopeMismatch)?;
+        if scope.provider().as_str() != self.provider_instance
+            || scope.namespace().as_str() != self.namespace
+        {
+            return Err(CapabilityError::ScopeMismatch);
+        }
         intent.validate().map_err(CapabilityError::InvalidIntent)?;
         if (matches!(intent.profile, AlgorithmProfile::Extension(_))
             || matches!(intent.operation, CryptoOperation::Extension { .. }))
@@ -372,6 +393,11 @@ impl ProviderCapabilities {
     pub fn intersection(&self, other: &Self) -> Result<Self, CapabilityError> {
         self.validate()?;
         other.validate()?;
+        // Intersection is a report for a *single* independently identified
+        // provider/tenant scope, not a vehicle for laundering HSM metadata.
+        if self.provider_instance != other.provider_instance || self.namespace != other.namespace {
+            return Err(CapabilityError::ScopeMismatch);
+        }
         let right: BTreeMap<_, _> = other
             .entries
             .iter()
@@ -408,6 +434,8 @@ impl ProviderCapabilities {
         };
         let result = Self {
             schema_version: CAPABILITY_SCHEMA_VERSION,
+            provider_instance: self.provider_instance.clone(),
+            namespace: self.namespace.clone(),
             protocol_revision: "intersection".into(),
             feature_revision: "intersection".into(),
             reported_protection: if self.reported_protection == other.reported_protection {
