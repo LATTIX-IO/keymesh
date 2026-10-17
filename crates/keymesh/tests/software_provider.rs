@@ -3,7 +3,7 @@
 
 use keymesh::{
     AlgorithmProfile, CorrelationId, CryptoOperation, EdDsaVariant, ExportRequirement, HostScope,
-    HostValidatedCapabilities, KeyProvider, KeyRef, KeySelector, LogicalKeyId,
+    HostValidatedCapabilities, KeyRef, KeySelector, LogicalKeyId,
     MAX_SOFTWARE_MESSAGE_BYTES, OperationCompletion, OperationInput, OperationIntent,
     OperationRequest, OperationState, PayloadDescriptor, PolicyContext, PolicyGate, PolicyVerdict,
     ProtectionClass, ProtectionRequirement, ProviderError, ProviderErrorKind, ProviderFuture,
@@ -728,7 +728,8 @@ fn concurrent_same_name_generation_allows_only_one_stored_key() {
     }
     let successes = tasks
         .into_iter()
-        .filter(|thread| thread.join().unwrap_or_else(|_| panic!("worker panicked")))
+        .map(|thread| thread.join().unwrap_or_else(|_| panic!("worker panicked")))
+        .filter(|did_create| *did_create)
         .count();
     assert_eq!(successes, 1);
 }
