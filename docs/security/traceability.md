@@ -40,3 +40,37 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 3. Bound on identifier and URI size; exact normalization and canonical format rules (KM-03).
 4. Whether explicit `MaterialVersionBound` is offered for provider versioned cryptography through a validated contract, or reserved for software/HSM providers with stronger revision guarantees.
 5. Struct/version compatibility format and semantic error codes for `UnknownCommitState`/`UnsupportedVersionAssurance`.
+
+
+## KM-05 fake-provider gateway test coverage (PR #12)
+
+The following Rust cases exercise the checked no-dispatch gateway with an
+in-memory spy. They are **not** evidence that a remote SDK or HSM enforces it.
+Provider and policy reads are allowed before policy decisions; the enforced
+zero-dispatch property refers specifically to cryptographic/lifecycle calls.
+
+| Threat/invariant | New fake-provider tests | Enforced property / remaining work |
+| --- | --- | --- |
+| TM-01 / INV-02 alias / rebound key | stale_exact_version_or_rebound_resource_is_not_dispatched | No changed concrete version/resource reaches the operation method; backend TOCTOU still KM-06/09 |
+| TM-02 / INV-01 tenant/provider substitution | mismatched_tenant_or_provider_is_rejected_before_any_provider_query; catalog_provider_or_namespace_swap_is_not_dispatched | Authenticated host scope and catalog scope must match |
+| TM-03 / INV-03 opaque/unselectable version | unknown_capability_or_version_is_not_dispatched | No observed material revision upgraded to selectable key material |
+| TM-05 / INV-11 fabricated HSM custody | verified_hsm_protection_is_not_replaced_by_provider_claim | Host validation and provider report must agree; neither is hardware attestation |
+| TM-07/TM-16 / INV-08/09 unknown remote commit | unknown_commit_requires_reconciliation_even_for_timeout_or_lost_ack; dropping_pending_future_after_dispatch_does_not_confirm_cancellation | No auto retry and no claim of remote rollback; lost acknowledgement produces UnknownCommitState |
+| TM-08 / INV-01 host audit labels | serialized_errors_outputs_and_correlation_are_redacted | Redacted errors and output Debug; correlation labels remain non-authoritative |
+| TM-09 / INV-05 prehash/digest classification | payload_mismatch_and_digest_length_fail_before_query_or_dispatch | Actual bytes and declared digest must match; KM-04 provides precise algorithm semantics |
+| TM-10 / INV-05 wrap/encrypt conflation | KM-04 algorithm_semantics regression; KM-05 discrete trait methods | Unsupported defaults; no operation translation or fallback |
+| TM-12 / INV-11 unknown capabilities | unknown_capability_or_version_is_not_dispatched | Unknown/unsupported cannot authorize operation |
+| TM-14 / INV-13 policy hook outage | denied_indeterminate_or_failed_mandatory_policy_never_dispatches | Denial, indeterminate, and policy error cause zero crypto operation calls |
+| Provider output substitution | substituted_target_or_wrong_response_kind_after_dispatch_is_unknown_commit | Bad result evidence after possible side effect is ambiguous, not NotDispatched |
+| Runtime neutrality / cancellation | future_dropped_before_first_poll_cannot_dispatch; simultaneous_requests_keep_scope_and_evidence_isolated | No Tokio dependence; simulated post-dispatch cancellation is not a remote confirmation |
+
+To execute this harness (no SDKs, no network):
+
+```sh
+cargo test --locked -p keymesh --test provider_contract
+cargo run --locked -p keymesh --example provider_contract
+```
+
+The test oracle has no cryptographic provider under test and cannot establish
+real provider capability, HSM custody, FIPS compliance, safe native retries,
+or key-material binding at the physical device. Those remain KM-06 onward.
