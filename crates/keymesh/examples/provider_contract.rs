@@ -4,23 +4,18 @@ use keymesh::{
     DigestAlgorithm, DispatchTarget, ExportRequirement, Exportability, HostScope,
     HostValidatedCapabilities, KeyProvider, KeyRef, KeySelector, LogicalKeyId, OperationInput,
     OperationIntent, OperationRequest, PayloadDescriptor, PolicyContext, PolicyGate, PolicyVerdict,
-    PreparedDispatch, ProtectionClass, ProtectionRequirement, ProviderCapabilities, ProviderError,
+    PreparedDispatch, ProtectionClass, ProtectionRequirement, ProviderCapabilities,
     ProviderFuture, ProviderInstanceId, ProviderNamespace, ProviderOutput, ProviderReply,
     ProviderResourceId, ProviderVersionId, ResolvedKey, SupportStatus, VersionModel,
     VersionRequirement, execute_checked,
 };
 use std::future::Future;
-use std::sync::Arc;
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{Context, Poll, Waker};
 
-struct NoopWake;
-impl Wake for NoopWake {
-    fn wake(self: Arc<Self>) {}
-}
 fn drive<F: Future>(future: F) -> F::Output {
     let mut future = Box::pin(future);
-    let waker = Waker::from(Arc::new(NoopWake));
-    let mut context = Context::from_waker(&waker);
+    let waker = Waker::noop();
+    let mut context = Context::from_waker(waker);
     loop {
         if let Poll::Ready(value) = future.as_mut().poll(&mut context) {
             return value;
