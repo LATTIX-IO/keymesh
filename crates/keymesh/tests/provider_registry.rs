@@ -798,24 +798,32 @@ fn failure_trace_reports_only_authorized_candidates_and_static_reasons() {
     assert_eq!(approved.crypto_calls.load(Ordering::SeqCst), 0);
 }
 
-
 #[test]
 fn changing_health_during_pending_capability_read_rejects_stale_selection() {
     let registry = ProviderRegistry::new();
     let provider = Fake::new("mock-hsm", "tenant-a", ProtectionClass::Hsm);
-    register(&registry, &provider, "tenant-a", ProtectionClass::Hsm, ProviderHealth::Healthy);
+    register(
+        &registry,
+        &provider,
+        "tenant-a",
+        ProtectionClass::Hsm,
+        ProviderHealth::Healthy,
+    );
     let s = scope("mock-hsm", "tenant-a");
     let allowed = [s.clone()];
     let choice = ProviderSelection::AnyCompatible;
     let i = intent();
     provider.hold_read.store(true, Ordering::Release);
     let route = registry.route_diagnostic(ProviderRequirements {
-        authorized_scopes: &allowed, intent: &i, selection: &choice,
+        authorized_scopes: &allowed,
+        intent: &i,
+        selection: &choice,
     });
     let mut pending = Box::pin(route);
     let mut context = Context::from_waker(Waker::noop());
     assert!(matches!(pending.as_mut().poll(&mut context), Poll::Pending));
-    registry.set_health(&s, ProviderHealth::Unavailable)
+    registry
+        .set_health(&s, ProviderHealth::Unavailable)
         .unwrap_or_else(|e| panic!("{e}"));
     provider.hold_read.store(false, Ordering::Release);
     match pending.as_mut().poll(&mut context) {
@@ -832,23 +840,37 @@ fn changing_health_during_pending_capability_read_rejects_stale_selection() {
 fn restored_health_does_not_resurrect_previously_selected_leases() {
     let registry = ProviderRegistry::new();
     let provider = Fake::new("mock-hsm", "tenant-a", ProtectionClass::Hsm);
-    register(&registry, &provider, "tenant-a", ProtectionClass::Hsm, ProviderHealth::Healthy);
+    register(
+        &registry,
+        &provider,
+        "tenant-a",
+        ProtectionClass::Hsm,
+        ProviderHealth::Healthy,
+    );
     let s = scope("mock-hsm", "tenant-a");
     let allowed = [s.clone()];
     let choice = ProviderSelection::Instance(instance("mock-hsm"));
     let i = intent();
     let old = drive(registry.route(ProviderRequirements {
-        authorized_scopes: &allowed, intent: &i, selection: &choice,
-    })).unwrap_or_else(|e| panic!("{e}"));
-    registry.set_health(&s, ProviderHealth::Unavailable)
+        authorized_scopes: &allowed,
+        intent: &i,
+        selection: &choice,
+    }))
+    .unwrap_or_else(|e| panic!("{e}"));
+    registry
+        .set_health(&s, ProviderHealth::Unavailable)
         .unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(old.ensure_live(), Err(RouteError::StaleRegistration));
-    registry.set_health(&s, ProviderHealth::Healthy)
+    registry
+        .set_health(&s, ProviderHealth::Healthy)
         .unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(old.ensure_live(), Err(RouteError::StaleRegistration));
     let renewed = drive(registry.route(ProviderRequirements {
-        authorized_scopes: &allowed, intent: &i, selection: &choice,
-    })).unwrap_or_else(|e| panic!("{e}"));
+        authorized_scopes: &allowed,
+        intent: &i,
+        selection: &choice,
+    }))
+    .unwrap_or_else(|e| panic!("{e}"));
     assert!(renewed.ensure_live().is_ok());
     assert_eq!(provider.crypto_calls.load(Ordering::SeqCst), 0);
 }
