@@ -60,6 +60,8 @@ struct SpyProvider {
     catalog: ProviderCapabilities,
     resolved: ResolvedKey,
     scenario: Scenario,
+    capability_error: Option<ProviderError>,
+    resolve_error: Option<ProviderError>,
     reads: Arc<AtomicUsize>,
     dispatches: Arc<AtomicUsize>,
 }
@@ -72,7 +74,10 @@ impl KeyProvider for SpyProvider {
         _scope: &'a HostScope,
     ) -> ProviderFuture<'a, ProviderCapabilities> {
         self.reads.fetch_add(1, Ordering::SeqCst);
-        Box::pin(async move { Ok(self.catalog.clone()) })
+        let error = self.capability_error;
+        Box::pin(async move {
+            if let Some(e) = error { Err(e) } else { Ok(self.catalog.clone()) }
+        })
     }
     fn resolve<'a>(
         &'a self,
@@ -80,7 +85,10 @@ impl KeyProvider for SpyProvider {
         _reference: &'a KeyRef,
     ) -> ProviderFuture<'a, ResolvedKey> {
         self.reads.fetch_add(1, Ordering::SeqCst);
-        Box::pin(async move { Ok(self.resolved.clone()) })
+        let error = self.resolve_error;
+        Box::pin(async move {
+            if let Some(e) = error { Err(e) } else { Ok(self.resolved.clone()) }
+        })
     }
     fn sign<'a>(
         &'a self,
@@ -256,6 +264,8 @@ impl Fixture {
                 catalog,
                 resolved,
                 scenario: Scenario::Success,
+                capability_error: None,
+                resolve_error: None,
                 reads: Arc::new(AtomicUsize::new(0)),
                 dispatches: Arc::new(AtomicUsize::new(0)),
             },
@@ -691,3 +701,94 @@ fn key_material_operations_are_not_allowed_without_a_sensitive_input_boundary() 
     );
     assert_eq!(t.dispatched(), 0);
 }
+
+#[test]
+fn read_only_capability_or_resolution_failures_cannot_claim_remote_crypto_commit() {
+    let errors = [
+        ProviderError::unknown_commit_state(),
+        ProviderError::confirmed_failure(ProviderErrorKind::Unavailable),
+    ];
+    for error in errors {
+        let mut t = Fixture::new();
+        t.provider.capability_error = Some(error);
+        assert_pre_dispatch(t.run(), ProviderErrorKind::Unavailable);
+        assert_eq!(t.dispatched(), 0);
+        assert_eq!(t.queried(), 1);
+
+        let mut t = Fixture::new();
+        t.provider.resolve_error = Some(error);
+        assert_pre_dispatch(t.run(), ProviderErrorKind::Unavailable);
+        assert_eq!(t.dispatched(), 0);
+        assert_eq!(t.queried(), 2);
+    }
+}
+
+#[test]
+fn rsa_pss_verification_signature_must_match_exact_modulus_length() {
+    let mut t = Fixture::new();
+    let operation = CryptoOperation::VerifyDigest { digest: DigestAlgorithm::Sha256 };
+    t.intent.operation = operation.clone();
+    t.provider.catalog.entries[0].operation = operation;
+    let short_sig = vec![0x42; 64];
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Digest {
+            algorithm: DigestAlgorithm::Sha256, bytes: &t.message,
+            authenticator: Some(&short_sig),
+        }),
+        ProviderErrorKind::InvalidInput,
+    );
+    assert_eq!(t.queried(), 0);
+
+    let enormous_sig = vec![0x42; keymesh::MAX_VERIFICATION_PROOF_BYTES + 1];
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Digest {
+            algorithm: DigestAlgorithm::Sha256, bytes: &t.message,
+            authenticator: Some(&enormous_sig),
+        }),
+        ProviderErrorKind::InvalidInput,
+    );
+    assert_eq!(t.queried(), 0);
+
+    // Correctly bounded proof gets past the input gate, but the fake provider
+    // does not implement verify, so it still refuses the operation.
+    let sized_sig = vec![0x42; 384];
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Digest {
+            algorithm: DigestAlgorithm::Sha256, bytes: &t.message,
+            authenticator: Some(&sized_sig),
+        }),
+        ProviderErrorKind::UnsupportedOperationOrProfile,
+    );
+    assert_eq!(t.dispatched(), 0);
+    assert_eq!(t.queried(), 2);
+}
+
+#[test]
+fn hmac_and_pqc_verification_authenticators_cannot_be_substituted() {
+    let mut t = Fixture::new();
+    let op = CryptoOperation::VerifyMacMessage;
+    t.intent.operation = op.clone();
+    t.intent.profile = AlgorithmProfile::Hmac {
+        digest: DigestAlgorithm::Sha256, key_bits: 256,
+    };
+    t.intent.payload = PayloadDescriptor::Message { bytes: 32 };
+    t.provider.catalog.entries[0].operation = op;
+    t.provider.catalog.entries[0].profile = t.intent.profile.clone();
+    let wrong = [0xAA; 64];
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Message {
+            bytes: &t.message, authenticator: Some(&wrong),
+        }),
+        ProviderErrorKind::InvalidInput,
+    );
+    assert_eq!(t.queried(), 0);
+    let valid = [0xAA; 32];
+    assert_pre_dispatch(
+        t.run_with(OperationInput::Message {
+            bytes: &t.message, authenticator: Some(&valid),
+        }),
+        ProviderErrorKind::UnsupportedOperationOrProfile,
+    );
+    assert_eq!(t.queried(), 2);
+}
+
