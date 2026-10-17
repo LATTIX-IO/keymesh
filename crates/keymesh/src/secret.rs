@@ -198,23 +198,24 @@ mod tests {
 
     #[test]
     fn explicit_erase_is_idempotent_and_leaves_no_readable_bytes() {
-        let mut secret = SecretBytes::from_vec(vec![0x7B; 32])
-            .unwrap_or_else(|e| panic!("{e}"));
+        let mut secret = SecretBytes::from_vec(vec![0x7B; 32]).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(secret.len(), 32);
         secret.erase();
         assert!(secret.is_empty());
         secret.erase();
         secret.with_exposed(|bytes| assert!(bytes.is_empty()));
 
-        let mut key = KeyMaterial::from_vec(vec![0x55; 48])
-            .unwrap_or_else(|e| panic!("{e}"));
+        let mut key = KeyMaterial::from_vec(vec![0x55; 48]).unwrap_or_else(|e| panic!("{e}"));
         key.erase();
         assert!(key.is_empty());
     }
 
     #[test]
     fn rejected_empty_oversized_and_excess_capacity_are_bounded() {
-        assert!(matches!(SecretBytes::from_vec(vec![]), Err(SecretError::Empty)));
+        assert!(matches!(
+            SecretBytes::from_vec(vec![]),
+            Err(SecretError::Empty)
+        ));
         assert!(matches!(
             SecretBytes::from_vec(vec![0xA5; MAX_SECRET_BYTES + 1]),
             Err(SecretError::TooLarge)
@@ -225,17 +226,25 @@ mod tests {
             SecretBytes::from_vec(oversized_allocation),
             Err(SecretError::TooLarge)
         ));
-        assert_eq!(SecretBytes::from_vec(vec![0x43; MAX_SECRET_BYTES])
-            .unwrap_or_else(|e| panic!("{e}")).len(), MAX_SECRET_BYTES);
+        assert_eq!(
+            SecretBytes::from_vec(vec![0x43; MAX_SECRET_BYTES])
+                .unwrap_or_else(|e| panic!("{e}"))
+                .len(),
+            MAX_SECRET_BYTES
+        );
     }
 
     #[test]
     fn error_debug_and_formatting_are_static_and_redacted() {
-        let secret = SecretBytes::from_vec(b"never-in-logs".to_vec())
-            .unwrap_or_else(|e| panic!("{e}"));
+        let secret =
+            SecretBytes::from_vec(b"never-in-logs".to_vec()).unwrap_or_else(|e| panic!("{e}"));
         let key = KeyMaterial::from_vec(b"private-key-material".to_vec())
             .unwrap_or_else(|e| panic!("{e}"));
-        let full = format!("{secret:?} {key:?} {} {:?}", SecretError::TooLarge, SecretError::Empty);
+        let full = format!(
+            "{secret:?} {key:?} {} {:?}",
+            SecretError::TooLarge,
+            SecretError::Empty
+        );
         assert!(!full.contains("never-in-logs"));
         assert!(!full.contains("private-key-material"));
         assert!(full.contains("<redacted>"));
