@@ -42,6 +42,18 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 5. Struct/version compatibility format and semantic error codes for `UnknownCommitState`/`UnsupportedVersionAssurance`.
 
 
+## KM-06 fake provider-registry traceability (FOSS-407)
+
+The Rust routing harness covers INV-01 (scope), INV-02/03 (concrete
+version), INV-04/11 (no HSM/software downgrade), INV-08/09 (do not
+reinterpret provider operation outcomes), and INV-13 (policy remains
+mandatory). Tests reject cross-tenant allowed sets and duplicate registrations;
+deny Unknown health/support; require exact FOSS-403 capability admission;
+show deterministic multi-provider tie-break; and revoke a route while an
+async capability read or policy decision is pending, with **zero crypto
+dispatch**. These tests use no actual HSM, KMS, secrets or network clients.
+Live adapter and remote revocation semantics remain out of scope.
+
 ## KM-05 fake-provider gateway test coverage (PR #12)
 
 The following Rust cases exercise the checked no-dispatch gateway with an
