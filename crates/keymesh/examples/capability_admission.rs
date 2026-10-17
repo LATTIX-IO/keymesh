@@ -1,11 +1,11 @@
 //! Executable no-cryptography demonstration of capability admission and version binding.
 use keymesh::{
-    AlgorithmProfile, CapabilityEntry, CryptoOperation, DigestAlgorithm, DispatchTarget,
-    ExportRequirement, Exportability, HostScope, HostValidatedCapabilities, KeyRef, KeySelector,
-    LogicalKeyId, OperationIntent, PayloadDescriptor, ProtectionClass, ProtectionRequirement,
-    ProviderCapabilities, ProviderInstanceId, ProviderNamespace, ProviderResourceId,
-    ProviderVersionId, RequiredAssurance, ResolvedKey, SupportStatus, VersionModel,
-    VersionRequirement, CAPABILITY_SCHEMA_VERSION, preflight_bind,
+    AlgorithmProfile, CAPABILITY_SCHEMA_VERSION, CapabilityEntry, CryptoOperation, DigestAlgorithm,
+    DispatchTarget, ExportRequirement, Exportability, HostScope, HostValidatedCapabilities, KeyRef,
+    KeySelector, LogicalKeyId, OperationIntent, PayloadDescriptor, ProtectionClass,
+    ProtectionRequirement, ProviderCapabilities, ProviderInstanceId, ProviderNamespace,
+    ProviderResourceId, ProviderVersionId, RequiredAssurance, ResolvedKey, SupportStatus,
+    VersionModel, VersionRequirement, preflight_bind,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
