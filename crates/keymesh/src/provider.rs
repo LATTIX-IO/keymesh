@@ -78,20 +78,33 @@ pub struct ProviderError {
 impl ProviderError {
     /// Adapter is certain an operation was not dispatched.
     pub const fn not_dispatched(kind: ProviderErrorKind) -> Self {
-        Self { kind, state: OperationState::NotDispatched }
+        Self {
+            kind,
+            state: OperationState::NotDispatched,
+        }
     }
     /// Provider positively confirmed a failure without remote commit.
     pub const fn confirmed_failure(kind: ProviderErrorKind) -> Self {
-        Self { kind, state: OperationState::ConfirmedFailure }
+        Self {
+            kind,
+            state: OperationState::ConfirmedFailure,
+        }
     }
     /// Remote commit state is unknown; never blindly retry a mutation.
     pub const fn unknown_commit_state() -> Self {
-        Self { kind: ProviderErrorKind::UnknownCommitState, state: OperationState::UnknownCommitState }
+        Self {
+            kind: ProviderErrorKind::UnknownCommitState,
+            state: OperationState::UnknownCommitState,
+        }
     }
     /// Sanitized error kind.
-    pub const fn kind(self) -> ProviderErrorKind { self.kind }
+    pub const fn kind(self) -> ProviderErrorKind {
+        self.kind
+    }
     /// Operation state as classified by the adapter.
-    pub const fn state(self) -> OperationState { self.state }
+    pub const fn state(self) -> OperationState {
+        self.state
+    }
     /// Conservative retry advice.
     pub const fn retry(self) -> RetryDisposition {
         match self.state {
@@ -112,7 +125,9 @@ impl fmt::Display for ProviderError {
             ProviderErrorKind::PolicyDenied => "mandatory policy denied",
             ProviderErrorKind::PolicyIndeterminate => "mandatory policy indeterminate",
             ProviderErrorKind::ScopeMismatch => "provider scope or key mismatch",
-            ProviderErrorKind::UnsupportedVersionAssurance => "required version assurance unavailable",
+            ProviderErrorKind::UnsupportedVersionAssurance => {
+                "required version assurance unavailable"
+            }
             ProviderErrorKind::UnverifiedCapability => "provider capability unverified",
             ProviderErrorKind::Unavailable => "provider unavailable",
             ProviderErrorKind::InvalidOperationEvidence => "invalid provider operation evidence",
@@ -129,15 +144,22 @@ pub struct CorrelationId(String);
 impl CorrelationId {
     /// Only 1–64 ASCII alphanumeric, hyphen, underscore or period bytes.
     pub fn parse(value: &str) -> Result<Self, ProviderError> {
-        if value.is_empty() || value.len() > 64
-            || !value.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        if value.is_empty()
+            || value.len() > 64
+            || !value
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
         {
-            return Err(ProviderError::not_dispatched(ProviderErrorKind::InvalidInput));
+            return Err(ProviderError::not_dispatched(
+                ProviderErrorKind::InvalidInput,
+            ));
         }
         Ok(Self(value.to_string()))
     }
     /// Non-secret audit identifier supplied by the trusted host.
-    pub fn as_str(&self) -> &str { &self.0 }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 impl fmt::Debug for CorrelationId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,7 +173,9 @@ impl fmt::Debug for CorrelationId {
 pub struct ProtectedResultRef(CorrelationId);
 impl ProtectedResultRef {
     /// Store an adapter-validated non-secret result reference.
-    pub fn new(reference: CorrelationId) -> Self { Self(reference) }
+    pub fn new(reference: CorrelationId) -> Self {
+        Self(reference)
+    }
 }
 impl fmt::Debug for ProtectedResultRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -173,7 +197,7 @@ pub enum ProviderOutput {
     /// Authentication tag; not an HMAC key.
     Mac(Vec<u8>),
     /// Public KEM ciphertext and opaque shared secret reference.
-    Encapsulation { 
+    Encapsulation {
         /// Encapsulation ciphertext.
         ciphertext: Vec<u8>,
         /// Secret held inside a provider-managed boundary.
@@ -210,13 +234,29 @@ impl ProviderOutput {
             | (O::WrapKey, Self::WrappedKey(v))
             | (O::MacMessage, Self::Mac(v))
             | (O::ExportPublic, Self::PublicKey(v)) => !v.is_empty(),
-            (O::VerifyMessage | O::VerifyDigest { .. } | O::VerifyExternalMu
-                | O::VerifyMacMessage, Self::Verification(_)) => true,
+            (
+                O::VerifyMessage
+                | O::VerifyDigest { .. }
+                | O::VerifyExternalMu
+                | O::VerifyMacMessage,
+                Self::Verification(_),
+            ) => true,
             (O::Encapsulate, Self::Encapsulation { ciphertext, .. }) => !ciphertext.is_empty(),
-            (O::Decrypt | O::UnwrapKey | O::Decapsulate | O::DeriveKey
-                | O::ExportPrivate, Self::Protected(_)) => true,
-            (O::Generate | O::Import | O::Rotate | O::Enable | O::Disable
-                | O::ScheduleDelete | O::Recover | O::Purge, Self::Acknowledged) => true,
+            (
+                O::Decrypt | O::UnwrapKey | O::Decapsulate | O::DeriveKey | O::ExportPrivate,
+                Self::Protected(_),
+            ) => true,
+            (
+                O::Generate
+                | O::Import
+                | O::Rotate
+                | O::Enable
+                | O::Disable
+                | O::ScheduleDelete
+                | O::Recover
+                | O::Purge,
+                Self::Acknowledged,
+            ) => true,
             _ => false,
         }
     }
@@ -236,7 +276,11 @@ impl ProviderReply {
         output: ProviderOutput,
         provider_request_id: Option<CorrelationId>,
     ) -> Self {
-        Self { observed_target, output, provider_request_id }
+        Self {
+            observed_target,
+            output,
+            provider_request_id,
+        }
     }
     pub(crate) fn into_parts(self) -> (DispatchTarget, ProviderOutput, Option<CorrelationId>) {
         (self.observed_target, self.output, self.provider_request_id)
@@ -259,21 +303,37 @@ pub struct PreparedDispatch<'a> {
 }
 impl PreparedDispatch<'_> {
     /// Concrete pinned provider target.
-    pub fn target(&self) -> &DispatchTarget { self.bound.dispatch_target() }
+    pub fn target(&self) -> &DispatchTarget {
+        self.bound.dispatch_target()
+    }
     /// Configured provider instance.
-    pub fn provider(&self) -> &ProviderInstanceId { self.bound.provider() }
+    pub fn provider(&self) -> &ProviderInstanceId {
+        self.bound.provider()
+    }
     /// Host-approved namespace.
-    pub fn namespace(&self) -> &ProviderNamespace { self.bound.namespace() }
+    pub fn namespace(&self) -> &ProviderNamespace {
+        self.bound.namespace()
+    }
     /// Logical key being operated on.
-    pub fn logical_key(&self) -> &LogicalKeyId { self.bound.logical_key() }
+    pub fn logical_key(&self) -> &LogicalKeyId {
+        self.bound.logical_key()
+    }
     /// Preflight claimed assurance level, not independent attestation.
-    pub fn assurance(&self) -> BindingAssurance { self.bound.assurance() }
+    pub fn assurance(&self) -> BindingAssurance {
+        self.bound.assurance()
+    }
     /// Exact immutable typed operation intent.
-    pub fn intent(&self) -> &OperationIntent { self.intent }
+    pub fn intent(&self) -> &OperationIntent {
+        self.intent
+    }
     /// Bounded safe host correlation label.
-    pub fn correlation(&self) -> &CorrelationId { self.correlation }
+    pub fn correlation(&self) -> &CorrelationId {
+        self.correlation
+    }
     /// Versioned provider feature snapshot; adapters re-check at dispatch.
-    pub fn feature_revision(&self) -> &str { self.feature_revision }
+    pub fn feature_revision(&self) -> &str {
+        self.feature_revision
+    }
 }
 
 macro_rules! optional_method {
@@ -306,7 +366,7 @@ pub trait KeyProvider: Send + Sync {
     fn instance(&self) -> &ProviderInstanceId;
     /// Read provider-scoped capability metadata with no mutating side effects.
     fn capabilities<'a>(&'a self, scope: &'a HostScope)
-        -> ProviderFuture<'a, ProviderCapabilities>;
+    -> ProviderFuture<'a, ProviderCapabilities>;
     /// Resolve a logical reference to an exact native target, read-only.
     fn resolve<'a>(
         &'a self,
