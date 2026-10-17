@@ -89,6 +89,16 @@ pub enum MlKemVariant {
     /// ML-KEM-1024.
     MlKem1024,
 }
+impl MlKemVariant {
+    /// FIPS 203 fixed encapsulation ciphertext size for the exact parameter set.
+    pub const fn ciphertext_bytes(self) -> u64 {
+        match self {
+            Self::MlKem512 => 768,
+            Self::MlKem768 => 1088,
+            Self::MlKem1024 => 1568,
+        }
+    }
+}
 
 /// FIPS 204 ML-DSA parameter set, not a digest algorithm.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -104,7 +114,7 @@ pub enum MlDsaVariant {
 
 /// Explicit ML-DSA input transformation, including provider-specific mu mode.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "mode", content = "parameters", rename_all = "snake_case")]
+#[serde(tag = "mode", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
 pub enum MlDsaInput {
     /// Pure ML-DSA signs the message under the provider's precise profile.
     Pure,
@@ -161,7 +171,7 @@ pub struct ExtensionProfile {
 
 /// An algorithm with exact parameters. No algorithm family means "any variant".
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "family", content = "parameters", rename_all = "snake_case")]
+#[serde(tag = "family", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AlgorithmProfile {
     /// RSA-PSS signing: key modulus, signature hash, MGF1 hash and salt bytes.
     RsaPss {
@@ -248,7 +258,7 @@ pub enum AlgorithmProfile {
 
 /// Typed cryptographic operation; distinct permissions cannot be equated.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "type", content = "details", rename_all = "snake_case")]
+#[serde(tag = "type", content = "details", rename_all = "snake_case", deny_unknown_fields)]
 pub enum CryptoOperation {
     /// Provider receives raw message; any internal hashing is profile-specific.
     SignMessage,
@@ -317,7 +327,7 @@ pub enum CryptoOperation {
 
 /// Metadata about supplied input; never carries plaintext, private keys or secrets.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "form", content = "parameters", rename_all = "snake_case")]
+#[serde(tag = "form", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PayloadDescriptor {
     /// No operation payload.
     None,
@@ -436,6 +446,8 @@ pub enum ProfileError {
     DigestLengthMismatch,
     /// Input exceeds an algorithm-specific structural limit.
     AlgorithmInputTooLarge,
+    /// A fixed-size ciphertext does not match its exact algorithm parameter set.
+    CiphertextLengthMismatch,
     /// Vendor extension has unsafe names, parameters, or unbounded fields.
     InvalidExtension,
 }
@@ -448,6 +460,7 @@ impl std::fmt::Display for ProfileError {
             Self::DigestMismatch => "digest algorithm does not match profile",
             Self::DigestLengthMismatch => "invalid digest or prehash length",
             Self::AlgorithmInputTooLarge => "algorithm structural input limit exceeded",
+            Self::CiphertextLengthMismatch => "ciphertext length does not match algorithm profile",
             Self::InvalidExtension => "invalid extension envelope",
         };
         f.write_str(text)
@@ -737,7 +750,13 @@ impl OperationIntent {
                         true
                     }
                     (O::UnwrapKey, P::Ciphertext { bytes }) => {
-                        if *bytes < 16 || bytes % 8 != 0 {
+                        // RFC 3394: 8-byte A value + >=2 blocks (>=24 bytes).
+                        // RFC 5649 padded key wrap admits a 16-byte ciphertext.
+                        let min_bytes = match variant {
+                            AesWrapVariant::Rfc3394 => 24,
+                            AesWrapVariant::Rfc5649 => 16,
+                        };
+                        if *bytes < min_bytes || bytes % 8 != 0 {
                             return Err(ProfileError::InvalidParameters);
                         }
                         true
@@ -749,9 +768,11 @@ impl OperationIntent {
                 matches!(self.payload, P::Message { .. })
             }
             (O::Encapsulate, A::MlKem { .. }) => matches!(self.payload, P::None),
-            (O::Decapsulate, A::MlKem { .. }) => {
-                matches!(self.payload, P::Ciphertext { bytes } if bytes > 0)
-            }
+            (O::Decapsulate, A::MlKem { variant }) => match self.payload {
+                P::Ciphertext { bytes } if bytes == variant.ciphertext_bytes() => true,
+                P::Ciphertext { .. } => return Err(ProfileError::CiphertextLengthMismatch),
+                _ => false,
+            },
             (O::DeriveKey, A::Hkdf { digest }) => {
                 if let P::Derivation {
                     info_bytes,
