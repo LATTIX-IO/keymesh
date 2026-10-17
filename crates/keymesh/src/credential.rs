@@ -226,7 +226,9 @@ pub async fn acquire_scoped_credential(
     {
         return Err(CredentialError::ScopeMismatch);
     }
-    let result = source.acquire(&request).await?;
+    // A credential source is not an authorization decision-maker. Never
+    // allow untrusted callback errors to impersonate policy or scope checks.
+    let result = source.acquire(&request).await.map_err(|_| CredentialError::Unavailable)?;
     if result.scope() != request.host_scope
         || result.operation() != request.operation
         || result.purpose() != request.purpose
