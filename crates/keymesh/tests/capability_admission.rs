@@ -1,10 +1,10 @@
 //! FOSS-403 fail-closed provider capability admission tests.
 use keymesh::{
-    AlgorithmProfile as A, AttestationClaim, CapabilityEntry, CapabilityError,
-    CryptoOperation as O, DigestAlgorithm as D, ExportRequirement, Exportability,
-    HostValidatedCapabilities, OperationIntent, PayloadDescriptor as P, ProfileError,
-    ProtectionClass, ProtectionRequirement, ProviderCapabilities, SupportStatus,
-    VersionModel, VersionRequirement, CAPABILITY_SCHEMA_VERSION, MAX_CAPABILITY_ENTRIES,
+    AlgorithmProfile as A, AttestationClaim, CAPABILITY_SCHEMA_VERSION, CapabilityEntry,
+    CapabilityError, CryptoOperation as O, DigestAlgorithm as D, ExportRequirement, Exportability,
+    HostValidatedCapabilities, MAX_CAPABILITY_ENTRIES, OperationIntent, PayloadDescriptor as P,
+    ProfileError, ProtectionClass, ProtectionRequirement, ProviderCapabilities, SupportStatus,
+    VersionModel, VersionRequirement,
 };
 
 fn rsa() -> A {
@@ -15,9 +15,17 @@ fn rsa() -> A {
         salt_bytes: 32,
     }
 }
-fn capability(operation: O, profile: A, support: SupportStatus, limit: Option<u64>) -> CapabilityEntry {
+fn capability(
+    operation: O,
+    profile: A,
+    support: SupportStatus,
+    limit: Option<u64>,
+) -> CapabilityEntry {
     CapabilityEntry {
-        operation, profile, support, max_input_bytes: limit
+        operation,
+        profile,
+        support,
+        max_input_bytes: limit,
     }
 }
 fn catalog() -> ProviderCapabilities {
@@ -40,12 +48,7 @@ fn catalog() -> ProviderCapabilities {
                 SupportStatus::Supported,
                 Some(32),
             ),
-            capability(
-                O::SignMessage,
-                rsa(),
-                SupportStatus::Unknown,
-                None,
-            ),
+            capability(O::SignMessage, rsa(), SupportStatus::Unknown, None),
         ],
     }
 }
@@ -61,7 +64,10 @@ fn request() -> OperationIntent {
     OperationIntent {
         operation: O::SignDigest { digest: D::Sha256 },
         profile: rsa(),
-        payload: P::Digest { algorithm: D::Sha256, bytes: 32 },
+        payload: P::Digest {
+            algorithm: D::Sha256,
+            bytes: 32,
+        },
         binding: VersionRequirement::ProviderVersion,
         protection: ProtectionRequirement::Hsm,
         export: ExportRequirement::None,
@@ -69,9 +75,13 @@ fn request() -> OperationIntent {
 }
 #[test]
 fn admitted_only_with_exact_supported_profile_and_host_verified_assurance() {
-    let admit = catalog().admit(&request(), &host())
+    let admit = catalog()
+        .admit(&request(), &host())
         .unwrap_or_else(|e| panic!("exact supported profile rejected: {e}"));
-    assert_eq!(admit.capability.operation, O::SignDigest { digest: D::Sha256 });
+    assert_eq!(
+        admit.capability.operation,
+        O::SignDigest { digest: D::Sha256 }
+    );
     assert_eq!(admit.max_input_bytes, Some(32));
 }
 #[test]
@@ -79,10 +89,16 @@ fn unknown_and_explicitly_unsupported_are_both_non_dispatchable() {
     let mut req = request();
     req.operation = O::SignMessage;
     req.payload = P::Message { bytes: 32 };
-    assert_eq!(catalog().admit(&req, &host()), Err(CapabilityError::UnknownCapability));
+    assert_eq!(
+        catalog().admit(&req, &host()),
+        Err(CapabilityError::UnknownCapability)
+    );
     let mut caps = catalog();
     caps.entries[1].support = SupportStatus::Unsupported;
-    assert_eq!(caps.admit(&req, &host()), Err(CapabilityError::UnsupportedCapability));
+    assert_eq!(
+        caps.admit(&req, &host()),
+        Err(CapabilityError::UnsupportedCapability)
+    );
 }
 #[test]
 fn sign_message_capability_never_substitutes_for_sign_digest() {
@@ -90,13 +106,21 @@ fn sign_message_capability_never_substitutes_for_sign_digest() {
     caps.entries.remove(0);
     caps.entries[0].support = SupportStatus::Supported;
     caps.entries[0].max_input_bytes = Some(1024);
-    assert_eq!(caps.admit(&request(), &host()), Err(CapabilityError::MissingCapability));
+    assert_eq!(
+        caps.admit(&request(), &host()),
+        Err(CapabilityError::MissingCapability)
+    );
 }
 #[test]
 fn same_digest_length_different_hash_family_is_not_equivalent() {
     let mut req = request();
-    req.operation = O::SignDigest { digest: D::Sha3_256 };
-    req.payload = P::Digest { algorithm: D::Sha3_256, bytes: 32 };
+    req.operation = O::SignDigest {
+        digest: D::Sha3_256,
+    };
+    req.payload = P::Digest {
+        algorithm: D::Sha3_256,
+        bytes: 32,
+    };
     assert_eq!(
         catalog().admit(&req, &host()),
         Err(CapabilityError::InvalidIntent(ProfileError::DigestMismatch))
@@ -106,13 +130,22 @@ fn same_digest_length_different_hash_family_is_not_equivalent() {
 fn provider_hsm_claim_without_independent_host_verification_is_not_enough() {
     let mut h = host();
     h.protection = None;
-    assert_eq!(catalog().admit(&request(), &h), Err(CapabilityError::UnverifiedProtection));
+    assert_eq!(
+        catalog().admit(&request(), &h),
+        Err(CapabilityError::UnverifiedProtection)
+    );
     let mut c = catalog();
     c.reported_protection = ProtectionClass::Tee;
-    assert_eq!(c.admit(&request(), &host()), Err(CapabilityError::UnverifiedProtection));
+    assert_eq!(
+        c.admit(&request(), &host()),
+        Err(CapabilityError::UnverifiedProtection)
+    );
     let mut h2 = host();
     h2.protection = Some(ProtectionClass::Tee);
-    assert_eq!(catalog().admit(&request(), &h2), Err(CapabilityError::UnverifiedProtection));
+    assert_eq!(
+        catalog().admit(&request(), &h2),
+        Err(CapabilityError::UnverifiedProtection)
+    );
 }
 #[test]
 fn attestation_claim_is_metadata_and_never_grants_trust_by_itself() {
@@ -123,7 +156,10 @@ fn attestation_claim_is_metadata_and_never_grants_trust_by_itself() {
         reference: "claim.999".into(),
     });
     let host = HostValidatedCapabilities::default();
-    assert_eq!(caps.admit(&request(), &host), Err(CapabilityError::UnverifiedVersion));
+    assert_eq!(
+        caps.admit(&request(), &host),
+        Err(CapabilityError::UnverifiedVersion)
+    );
 }
 #[test]
 fn claimed_aws_material_revision_is_not_verified_selectable_material() {
@@ -144,24 +180,39 @@ fn unknown_version_provenance_never_satisfies_stable_key_requirement() {
     c.reported_version_model = VersionModel::Unknown;
     let mut req = request();
     req.binding = VersionRequirement::StableResource;
-    assert_eq!(c.admit(&req, &host()), Err(CapabilityError::UnverifiedVersion));
+    assert_eq!(
+        c.admit(&req, &host()),
+        Err(CapabilityError::UnverifiedVersion)
+    );
     let mut h = host();
     h.version_model = None;
-    assert_eq!(catalog().admit(&req, &h), Err(CapabilityError::UnverifiedVersion));
+    assert_eq!(
+        catalog().admit(&req, &h),
+        Err(CapabilityError::UnverifiedVersion)
+    );
 }
 #[test]
 fn unsupported_protection_is_not_satisfied_by_stronger_name_guessing() {
     let mut req = request();
     req.protection = ProtectionRequirement::Tee;
-    assert_eq!(catalog().admit(&req, &host()), Err(CapabilityError::UnverifiedProtection));
+    assert_eq!(
+        catalog().admit(&req, &host()),
+        Err(CapabilityError::UnverifiedProtection)
+    );
 }
 #[test]
 fn payload_limits_are_required_and_never_guessed_from_profile_family() {
     let mut c = catalog();
     c.entries[0].max_input_bytes = Some(31);
-    assert_eq!(c.admit(&request(), &host()), Err(CapabilityError::PayloadTooLarge));
+    assert_eq!(
+        c.admit(&request(), &host()),
+        Err(CapabilityError::PayloadTooLarge)
+    );
     c.entries[0].max_input_bytes = None;
-    assert_eq!(c.admit(&request(), &host()), Err(CapabilityError::PayloadLimitUnknown));
+    assert_eq!(
+        c.admit(&request(), &host()),
+        Err(CapabilityError::PayloadLimitUnknown)
+    );
 }
 #[test]
 fn private_material_export_requires_explicit_operation_and_host_approval() {
@@ -170,10 +221,21 @@ fn private_material_export_requires_explicit_operation_and_host_approval() {
     req.payload = P::None;
     req.export = ExportRequirement::Private;
     let mut c = catalog();
-    c.entries.push(capability(O::ExportPrivate, rsa(), SupportStatus::Supported, Some(0)));
-    assert_eq!(c.admit(&req, &host()), Err(CapabilityError::ExportNotPermitted));
+    c.entries.push(capability(
+        O::ExportPrivate,
+        rsa(),
+        SupportStatus::Supported,
+        Some(0),
+    ));
+    assert_eq!(
+        c.admit(&req, &host()),
+        Err(CapabilityError::ExportNotPermitted)
+    );
     c.reported_exportability = Exportability::Private;
-    assert_eq!(c.admit(&req, &host()), Err(CapabilityError::ExportNotPermitted));
+    assert_eq!(
+        c.admit(&req, &host()),
+        Err(CapabilityError::ExportNotPermitted)
+    );
     let mut h = host();
     h.permit_private_export = true;
     assert!(c.admit(&req, &h).is_ok());
@@ -181,7 +243,9 @@ fn private_material_export_requires_explicit_operation_and_host_approval() {
     bad_req.operation = O::SignDigest { digest: D::Sha256 };
     assert_eq!(
         c.admit(&bad_req, &h),
-        Err(CapabilityError::InvalidIntent(ProfileError::OperationMismatch))
+        Err(CapabilityError::InvalidIntent(
+            ProfileError::OperationMismatch
+        ))
     );
 }
 #[test]
@@ -227,10 +291,17 @@ fn capability_intersection_is_order_stable_and_downgrades_unknown() {
     assert_eq!(first.entries, second.entries);
     assert_eq!(first.attestation_claims.len(), 0);
     assert_eq!(first.entries.len(), 2);
-    assert!(first.entries.iter().any(|e| e.operation == O::SignDigest { digest: D::Sha256 }
-        && e.support == SupportStatus::Supported && e.max_input_bytes == Some(32)));
+    assert!(
+        first
+            .entries
+            .iter()
+            .any(|e| e.operation == O::SignDigest { digest: D::Sha256 }
+                && e.support == SupportStatus::Supported
+                && e.max_input_bytes == Some(32))
+    );
     assert!(first.entries.iter().any(|e| e.operation == O::SignMessage
-        && e.support == SupportStatus::Unknown && e.max_input_bytes.is_none()));
+        && e.support == SupportStatus::Unknown
+        && e.max_input_bytes.is_none()));
 }
 #[test]
 fn intersection_does_not_expand_unknown_support_or_protection() {
