@@ -1,6 +1,6 @@
 # Keymesh feature and conformance matrix
 
-Status: FOSS-409 / KM-08 pre-release API baseline. This matrix reports
+Status: FOSS-410 / KM-09 pre-release API baseline. This matrix reports
 **implemented code contracts**, not a certified security product.
 
 | Capability | Contract in Rust | Live provider implementation | Independent conformance |
@@ -21,6 +21,8 @@ Status: FOSS-409 / KM-08 pre-release API baseline. This matrix reports
 | Host-approved provider/tenant/operation-scoped credential callbacks | KM-07 contract | Fake only | Denial/invalid-scope/mismatched-return regressions |
 | Production credential broker, OS locked memory and native key import | Not implemented | No | Subsequent adapter/security increments |
 | Feature-gated Ed25519 pure-message software sign/verify and public key | KM-08, yes | Ephemeral local-only | RFC 8032 KATs, scoped lifecycle and gateway tests |
+| Immutable local software versions, CAS rotation, exact history, disable/enable/delete | KM-09, yes | Ephemeral local-only | Historical signatures, pending-policy rotation and alias race regressions |
+| Durable lifecycle journal, multi-process state or clock-driven deletion | Not implemented | No | Future lifecycle hardening |
 | RSA/ECDSA, Ed448, prehash and non-software providers | Not implemented | No | Later capability increments |
 | PKCS#11 hardware modules or cloud KMS integration | Not implemented | No | KM-14–17 planned |
 | Provider attestation and certified protection verification | Not implemented | No | Live validation needed |
