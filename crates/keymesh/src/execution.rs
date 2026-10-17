@@ -385,6 +385,7 @@ pub async fn execute_checked(
         intent: request.intent,
         correlation: request.correlation,
         feature_revision: &catalog.feature_revision,
+        protocol_revision: &catalog.protocol_revision,
     };
     // The only operation dispatch point. No generic implicit provider fallback.
     let reply: ProviderReply = match &request.intent.operation {
@@ -411,7 +412,7 @@ pub async fn execute_checked(
     let (observed_target, output, provider_request_id) = reply.into_parts();
     // A bad receipt arrives *after* possible remote side effects: never
     // return NotDispatched or blindly retry a side-effecting operation.
-    if observed_target != *prepared.target() || !output.matches_operation(&request.intent.operation)
+    if observed_target != *prepared.target() || !output.matches_operation(request.intent)
     {
         return Err(ProviderError::unknown_commit_state());
     }
