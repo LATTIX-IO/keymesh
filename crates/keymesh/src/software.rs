@@ -28,8 +28,8 @@ use zeroize::Zeroizing;
 mod lifecycle;
 pub use lifecycle::{
     MAX_SOFTWARE_VERSIONS_PER_KEY, SoftwareLifecycleEvidence, SoftwareLogicalSnapshot,
-    SoftwareRotateRequest, SoftwareRotation, SoftwareTransitionAction,
-    SoftwareTransitionRequest, SoftwareVersionSnapshot,
+    SoftwareRotateRequest, SoftwareRotation, SoftwareTransitionAction, SoftwareTransitionRequest,
+    SoftwareVersionSnapshot,
 };
 
 /// Hard cap on one pure-Ed25519 message accepted by software dispatch.
@@ -304,19 +304,29 @@ impl SoftwareProvider {
         // An Active or Latest alias resolved BEFORE policy evaluation is a
         // pinned target, not an authorization to follow a future rotation.
         match request.requested_selector() {
-            KeySelector::Active if record.active.as_ref() != Some(version) =>
-                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
-            KeySelector::Latest if record.latest.as_ref() != Some(version) =>
-                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance)),
+            KeySelector::Active if record.active.as_ref() != Some(version) => {
+                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
+            }
+            KeySelector::Latest if record.latest.as_ref() != Some(version) => {
+                return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
+            }
             _ => {}
         }
         match request.intent().operation {
             CryptoOperation::SignMessage
                 if entry.status == SoftwareVersionState::Active
-                    && record.active.as_ref() == Some(version) => Ok(entry),
+                    && record.active.as_ref() == Some(version) =>
+            {
+                Ok(entry)
+            }
             CryptoOperation::VerifyMessage | CryptoOperation::ExportPublic
-                if matches!(entry.status, SoftwareVersionState::Active | SoftwareVersionState::Retired) =>
-                    Ok(entry),
+                if matches!(
+                    entry.status,
+                    SoftwareVersionState::Active | SoftwareVersionState::Retired
+                ) =>
+            {
+                Ok(entry)
+            }
             _ => Err(denied(ProviderErrorKind::AuthorizationDenied)),
         }
     }
@@ -386,9 +396,13 @@ impl KeyProvider for SoftwareProvider {
             {
                 return Err(denied(ProviderErrorKind::ScopeMismatch));
             }
-            let keys = self.keys.read()
+            let keys = self
+                .keys
+                .read()
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
-            let record = keys.records.get(reference.logical_key())
+            let record = keys
+                .records
+                .get(reference.logical_key())
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             let version = match reference.selector() {
                 KeySelector::Active => record.active.as_ref(),
@@ -397,14 +411,19 @@ impl KeyProvider for SoftwareProvider {
                 _ => None,
             }
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-            let key = record.versions.get(version)
+            let key = record
+                .versions
+                .get(version)
                 .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
             if let KeySelector::ExactProviderVersion { resource, .. } = reference.selector() {
                 if key.target.resource() != resource {
                     return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
                 }
             }
-            if !matches!(key.status, SoftwareVersionState::Active | SoftwareVersionState::Retired) {
+            if !matches!(
+                key.status,
+                SoftwareVersionState::Active | SoftwareVersionState::Retired
+            ) {
                 return Err(denied(ProviderErrorKind::AuthorizationDenied));
             }
             Ok(ResolvedKey::new(
