@@ -268,8 +268,9 @@ fn catalog_revision_and_attestation_metadata_are_bounded() {
     assert_eq!(c.validate(), Err(CapabilityError::InvalidCatalog));
     c.feature_revision = "v1".into();
     c.attestation_claims[0].reference = "credential.token".into();
-    // Metadata is never trusted, but structurally valid printable identifiers
-    // must not be elevated into protection evidence by a parser.
+    assert_eq!(c.validate(), Err(CapabilityError::InvalidCatalog));
+    // Even syntactically valid references never elevate claims to trust.
+    c.attestation_claims[0].reference = "r.1".into();
     assert!(c.validate().is_ok());
     c.attestation_claims[0].reference = "has spaces and secrets".into();
     assert_eq!(c.validate(), Err(CapabilityError::InvalidCatalog));
