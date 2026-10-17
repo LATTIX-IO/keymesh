@@ -85,9 +85,10 @@ for permissioned audit sinks only.
 
 `OperationInput` borrows real payload bytes and checks classification/size
 against the typed KM-04 intent. Raw key material is NOT copied or zeroized by
-the KM-05 gateway. A production adapter must not accept sensitive raw input
-until KM-07 supplies its explicit secure secret container and credential
-boundary. Returned secret material is represented as an opaque
+the KM-05 gateway; the checked gateway now hard-rejects KeyMaterial input
+(including key wrapping) until KM-07 supplies a secure secret container and
+credential boundary. No KM-05 adapter may read private material through
+the unchecked byte-slice input carrier. Returned secret material is represented as an opaque
 `ProtectedResultRef` with NO retrieval method or raw secret bytes. This is not
 a validated secure-memory implementation; do not treat it as one.
 
@@ -100,6 +101,7 @@ Vendor-extension dispatch remains unsupported in the checked gateway even
 if a provider reports it; explicit sandboxed/authorized extensions require a
 future, separately reviewed contract.
 
+The checked gateway also rejects raw key-material input before provider reads.
 The provider trait exposes optional methods for operations not yet reachable
 from KM-05. They default to Unsupported and cannot be interpreted as an
 implemented cryptographic feature. A provider claiming protected-output
