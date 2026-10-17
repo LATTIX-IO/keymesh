@@ -114,7 +114,12 @@ pub enum MlDsaVariant {
 
 /// Explicit ML-DSA input transformation, including provider-specific mu mode.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "mode", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "mode",
+    content = "parameters",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum MlDsaInput {
     /// Pure ML-DSA signs the message under the provider's precise profile.
     Pure,
@@ -171,7 +176,12 @@ pub struct ExtensionProfile {
 
 /// An algorithm with exact parameters. No algorithm family means "any variant".
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "family", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "family",
+    content = "parameters",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum AlgorithmProfile {
     /// RSA-PSS signing: key modulus, signature hash, MGF1 hash and salt bytes.
     RsaPss {
@@ -258,7 +268,12 @@ pub enum AlgorithmProfile {
 
 /// Typed cryptographic operation; distinct permissions cannot be equated.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "type", content = "details", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "type",
+    content = "details",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum CryptoOperation {
     /// Provider receives raw message; any internal hashing is profile-specific.
     SignMessage,
@@ -327,7 +342,12 @@ pub enum CryptoOperation {
 
 /// Metadata about supplied input; never carries plaintext, private keys or secrets.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(tag = "form", content = "parameters", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "form",
+    content = "parameters",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
 pub enum PayloadDescriptor {
     /// No operation payload.
     None,
