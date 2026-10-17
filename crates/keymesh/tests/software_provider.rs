@@ -742,7 +742,7 @@ fn explicitly_enrolled_software_route_executes_real_signature_and_fails_after_re
     let registry = ProviderRegistry::new();
     registry
         .register(
-            Arc::clone(&f.provider),
+            f.provider.clone(),
             f.scope.clone(),
             f.host.clone(),
             ProviderHealth::Healthy,
