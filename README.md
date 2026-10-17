@@ -76,6 +76,36 @@ The URI parser performs no I/O or cryptography. A parsed reference still
 requires host-authorized `HostScope` and actual provider-side binding before
 it can be used for an operation.
 
+## KM-04: typed cryptographic operations and capability admission
+
+Keymesh now exposes a declarative **operation/capability contract**, not
+a cryptographic implementation. `CryptoOperation` explicitly separates
+SignMessage vs SignDigest, key wrap vs encryption, KEM vs general encryption,
+HMAC vs signatures, special ML-DSA external-mu signing, lifecycle permissions,
+and public vs private export. `AlgorithmProfile` carries exact RSA, ECC, AES,
+HMAC/HKDF and NIST PQC parameter sets. `PayloadDescriptor` contains lengths
+and input classification only, **never key material or plaintext**.
+
+`ProviderCapabilities::admit` requires an exact reported algorithm+operation
+match with supported status, bounded input and independently host-corroborated
+version/custody constraints. A provider's self-reported HSM claim or attestation
+metadata is not proof of trusted custody. Unknown capability/assurance, mismatched
+hash, unapproved private export and unknown extensions fail closed.
+`ProviderCapabilities::intersection` is deterministic and conservative.
+
+See the [schema and security contract](docs/specs/capabilities-v1.md) and
+[golden JSON fixture](tests/fixtures/capability_schema_v1.json).
+
+```sh
+cargo run --locked -p keymesh --example capability_admission
+cargo test --workspace --all-features --locked
+```
+
+The example performs no key generation, cryptographic operation, KMS request,
+secret transmission, or real hardware attestation. Provider adapters and
+enforcement remain KM-05/06 and later increments. The crate is still
+`publish = false`.
+
 ## Crates
 
 - keymesh
