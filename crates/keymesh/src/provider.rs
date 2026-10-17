@@ -310,6 +310,7 @@ impl fmt::Debug for ProviderReply {
 pub struct PreparedDispatch<'a> {
     pub(crate) bound: BoundKey<'a>,
     pub(crate) intent: &'a OperationIntent,
+    pub(crate) requested_selector: &'a crate::KeySelector,
     pub(crate) correlation: &'a CorrelationId,
     pub(crate) feature_revision: &'a str,
     pub(crate) protocol_revision: &'a str,
@@ -338,6 +339,11 @@ impl PreparedDispatch<'_> {
     /// Exact immutable typed operation intent.
     pub fn intent(&self) -> &OperationIntent {
         self.intent
+    }
+    /// Original requested alias or exact version, preserved solely to detect
+    /// mutable-selector races; native dispatch still uses the pinned target.
+    pub fn requested_selector(&self) -> &crate::KeySelector {
+        self.requested_selector
     }
     /// Bounded safe host correlation label.
     pub fn correlation(&self) -> &CorrelationId {
