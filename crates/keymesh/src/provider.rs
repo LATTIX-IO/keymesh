@@ -18,6 +18,8 @@ pub type ProviderFuture<'a, T> =
 pub enum OperationState {
     /// No operation was dispatched.
     NotDispatched,
+    /// Provider confirmed successful completion (not an HSM attestation).
+    ConfirmedSuccess,
     /// Provider confirmed an unsuccessful operation with no commit.
     ConfirmedFailure,
     /// Submission may have committed even though no acknowledgement arrived.
@@ -94,6 +96,7 @@ impl ProviderError {
     pub const fn retry(self) -> RetryDisposition {
         match self.state {
             OperationState::NotDispatched => RetryDisposition::SafeAfterCorrection,
+            OperationState::ConfirmedSuccess => RetryDisposition::DoNotAutoRetry,
             OperationState::ConfirmedFailure => RetryDisposition::DoNotAutoRetry,
             OperationState::UnknownCommitState => RetryDisposition::ReconcileBeforeRetry,
         }
