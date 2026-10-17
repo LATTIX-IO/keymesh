@@ -102,3 +102,17 @@ Publication remains disabled by `publish=false`. No actual HSM,
 remote secret backend, compliance certification or production readiness
 claim is made. Rotation, durable key lifecycle, algorithms beyond pure
 Ed25519 and extra platform controls belong to subsequent increments.
+
+
+## KM-09 extension
+
+The KM-08 one-version-per-logical-name implementation has been
+superseded by [KM-09](software-lifecycle-v1.md). A logical key now has
+immutable, independently seeded provider versions, exactly one active
+version, bounded historical retention and CAS-controlled lifecycle.
+Original KM-08 creation and exact purge remain compatible. KM-05
+targetless Generate/Import and raw key-material guards remain unchanged.
+Active/Latest are now read-only aliases pinned before policy, never
+valid for lifecycle mutation. Host-permitted exact-version historical
+verification remains available after rotation; retired versions
+cannot sign and disabled/pending versions cannot be used for crypto.
