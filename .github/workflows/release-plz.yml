@@ -23,6 +23,7 @@ jobs:
         uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # stable
         with:
           toolchain: stable
+          components: rustfmt, clippy
 
       - name: Assert non-publishing posture
         run: python3 scripts/check_release_safety.py
@@ -30,7 +31,5 @@ jobs:
       - name: Validate workspace manifests (offline from any registry publish)
         run: cargo metadata --workspace --no-deps --locked --format-version 1 > /dev/null
 
-      - name: Verify package builds and tests
-        run: |
-          cargo check --workspace --all-targets --all-features --locked
-          cargo test --workspace --all-features --locked
+      - name: Validate release candidate and print candidate SHA-256 evidence
+        run: bash scripts/release_candidate_preflight.sh

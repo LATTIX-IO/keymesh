@@ -6,7 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "keymesh library for the keymesh project."
+description = "Provider-neutral typed key operations and version-safe ephemeral Ed25519 signing for Rust."
+keywords = ["cryptography", "key-management", "security", "ed25519"]
+categories = ["cryptography", "authentication"]
 readme = "README.md"
 
 # This is an unreleased bootstrap package. Publication must be enabled only
