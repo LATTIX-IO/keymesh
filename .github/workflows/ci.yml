@@ -90,6 +90,27 @@ jobs:
       - name: Independently packaged consumer acceptance
         run: bash scripts/test_packaged_consumer.sh
 
+      - name: Check standalone manual Keymesh tour
+        run: cargo check --manifest-path labs/keymesh-tour/Cargo.toml
+
+      - name: Exercise individual tour commands against the real provider
+        run: |
+          printf '%s\n' \
+            scope capabilities route 'health healthy' route status create-denied create \
+            uri 'sign approve payment 481' verify tamper export-public \
+            'sign-alias review project approval' verify \
+            policy-deny policy-unknown require-hsm require-material audit-fail cross-tenant \
+            rotate verify retired-sign stale-rotate disable 'sign while disabled' enable \
+            purge-old verify 'sign current version' verify reset status quit \
+            | cargo run --quiet --manifest-path labs/keymesh-tour/Cargo.toml \
+            | tee /tmp/keymesh-tour-output.txt
+          grep -q 'cryptographic signature verification=true' /tmp/keymesh-tour-output.txt
+          grep -q 'cryptographic signature verification=false' /tmp/keymesh-tour-output.txt
+          grep -q 'REJECTED signing with retired key:' /tmp/keymesh-tour-output.txt
+          grep -q 'REJECTED rotation: kind=UnsupportedVersionAssurance' /tmp/keymesh-tour-output.txt
+          grep -q 'REJECTED cross-tenant substitution: kind=ScopeMismatch' /tmp/keymesh-tour-output.txt
+          grep -q 'NO KEY: fresh provider contains no keys' /tmp/keymesh-tour-output.txt
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
@@ -133,6 +154,9 @@ jobs:
 
       - name: Check software-provider omitted at MSRV
         run: cargo check --locked -p keymesh --all-targets --no-default-features
+
+      - name: Check independent tour package at MSRV
+        run: cargo check --manifest-path labs/keymesh-tour/Cargo.toml
 
       - name: Test workspace at MSRV
         run: cargo test --workspace --all-features --locked
