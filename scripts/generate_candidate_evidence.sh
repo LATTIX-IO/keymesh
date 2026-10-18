@@ -19,8 +19,11 @@ mkdir -p target/release-evidence
 cargo package -p keymesh --locked --allow-dirty --no-verify
 ARCHIVE="target/package/keymesh-$VERSION.crate"
 test -s "$ARCHIVE"
+# Enumerate the entire compressed archive first. Grep -q directly from tar
+# would close its output early and produce a false failure under pipefail.
+tar -tzf "$ARCHIVE" > target/release-evidence/PACKAGE_CONTENTS.txt
 for required in README.md LICENSE-APACHE LICENSE-MIT; do
-  if ! tar -tzf "$ARCHIVE" | grep -Fxq "keymesh-$VERSION/$required"; then
+  if ! grep -Fxq "keymesh-$VERSION/$required" target/release-evidence/PACKAGE_CONTENTS.txt; then
     echo "Packaged crate lacks $required" >&2
     exit 1
   fi
