@@ -21,12 +21,12 @@ pub struct PolicyRequirements {
     pub protection: Option<ProtectionClass>,
 }
 impl PolicyRequirements {
-    fn permits(
-        &self,
-        context: &PolicyContext<'_>,
-        host: &HostValidatedCapabilities,
-    ) -> bool {
-        if self.algorithm.as_ref().is_some_and(|p| p != &context.intent.profile) {
+    fn permits(&self, context: &PolicyContext<'_>, host: &HostValidatedCapabilities) -> bool {
+        if self
+            .algorithm
+            .as_ref()
+            .is_some_and(|p| p != &context.intent.profile)
+        {
             return false;
         }
         if let Some(required) = self.min_version {
@@ -85,10 +85,7 @@ impl fmt::Debug for PolicyDecisionEvidence<'_> {
 /// Trusted host adapter returning typed decisions; no plaintext input is passed.
 pub trait DecisionPolicyGate: Send + Sync {
     /// Evaluate a fully resolved, checked pre-dispatch request.
-    fn decide<'a>(
-        &'a self,
-        context: &'a PolicyContext<'_>,
-    ) -> ProviderFuture<'a, PolicyDecision>;
+    fn decide<'a>(&'a self, context: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyDecision>;
 }
 
 /// Optional synchronous pre-dispatch record sink. Failures prevent dispatch.
