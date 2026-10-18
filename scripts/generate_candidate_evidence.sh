@@ -30,7 +30,8 @@ for required in README.md LICENSE-APACHE LICENSE-MIT; do
 done
 cp "$ARCHIVE" "target/release-evidence/keymesh-$VERSION.crate"
 # Build from resolved exact Cargo metadata and the locked dependency graph.
-# SOURCE_DATE_EPOCH stabilizes the BOM timestamp and omits a random serial.
+# SOURCE_DATE_EPOCH stabilizes timestamps. A deterministic UUIDv5 serial is
+# added after generation for the pinned GitHub attestation action.
 SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)" \
   cargo cyclonedx --manifest-path crates/keymesh/Cargo.toml \
   --format json --all-features --target all --spec-version 1.5 --license-strict
@@ -40,7 +41,9 @@ if [ "${#BOMS[@]}" -ne 1 ]; then
   exit 1
 fi
 mv "${BOMS[0]}" "target/release-evidence/keymesh-$VERSION.cdx.json"
-python3 scripts/verify_candidate_evidence.py "target/release-evidence/keymesh-$VERSION.cdx.json" "$VERSION"
+SOURCE_SHA="$(git rev-parse --verify HEAD)"
+python3 scripts/verify_candidate_evidence.py --normalize \
+  "target/release-evidence/keymesh-$VERSION.cdx.json" "$VERSION" "$SOURCE_SHA"
 (
   cd target/release-evidence
   sha256sum "keymesh-$VERSION.crate" "keymesh-$VERSION.cdx.json" > SHA256SUMS
