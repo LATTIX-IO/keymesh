@@ -111,6 +111,25 @@ secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
 
+## KM-11: independent packaged-crate consumer
+
+Build and run Keymesh from its locally packaged `.crate` archive in a fresh
+temporary Rust project, with no workspace-relative paths, private Lattix
+dependencies or registry publication:
+
+```sh
+bash scripts/test_packaged_consumer.sh
+```
+
+The independent consumer exercises OS-backed Ed25519 generation, sign/verify,
+immutable rotation, historical signature verification, retired-key signing
+refusal, disable/enable, and a denied policy call. The script also proves
+that the software-provider feature is unavailable without explicit opt-in.
+Both stable Rust and the declared Rust 1.85 MSRV execute this gate in CI.
+The example's static Permit/Deny evaluators are **demonstration fixtures**,
+not authentication or production IAM. No persistent secret store, KMS/HSM
+integration, attestation or crates.io publication is provided.
+
 ## KM-09: version-safe logical lifecycle and atomic rotation
 
 A separately host-authorized `rotate` operation mints a fresh

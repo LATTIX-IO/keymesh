@@ -87,6 +87,9 @@ jobs:
       - name: Execute version-safe rotation consumer
         run: cargo run --locked -p keymesh --features software-provider --example software_rotation
 
+      - name: Independently packaged consumer acceptance
+        run: bash scripts/test_packaged_consumer.sh
+
       - name: Documentation
         env:
           RUSTDOCFLAGS: -D warnings
