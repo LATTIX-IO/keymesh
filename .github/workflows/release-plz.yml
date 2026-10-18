@@ -30,7 +30,5 @@ jobs:
       - name: Validate workspace manifests (offline from any registry publish)
         run: cargo metadata --workspace --no-deps --locked --format-version 1 > /dev/null
 
-      - name: Verify package builds and tests
-        run: |
-          cargo check --workspace --all-targets --all-features --locked
-          cargo test --workspace --all-features --locked
+      - name: Validate release candidate and print candidate SHA-256 evidence
+        run: bash scripts/release_candidate_preflight.sh
