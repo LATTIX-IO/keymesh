@@ -71,6 +71,15 @@ Verify the resulting signed candidate archive using:
 gh attestation verify keymesh-<candidate>.crate --repo LATTIX-IO/keymesh
 ```
 
+The candidate CycloneDX generator's reproducible output omitted `serialNumber`,
+which the pinned GitHub `actions/attest@v4.2.2` explicitly requires, along
+with `bomFormat` and `specVersion`. CI now inserts a deterministic RFC 4122
+UUIDv5 URN bound to the exact source commit and package version, checks it
+against adversarial fixtures, and verifies two signed attestation predicates:
+`https://slsa.dev/provenance/v1` and `https://cyclonedx.org/bom`.
+This is a format compatibility correction, not a substitute for independent
+CycloneDX schema validation or proof of registry publication.
+
 These attestations cannot authorize publication and must be regenerated
 against the final approved release version. Neither workflow authenticates
 crates.io ownership or issues a release tag.
