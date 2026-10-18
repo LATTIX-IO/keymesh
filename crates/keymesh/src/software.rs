@@ -180,7 +180,7 @@ impl fmt::Debug for CreatedSoftwareKey {
 pub enum SoftwareVersionState {
     /// The sole version currently permitted to sign this logical key.
     Active,
-    /// No longer permitted to sign; exact-version verification remains possible.
+    /// Permanently retired from signing; exact-version verification remains possible.
     Retired,
     /// No sign, verify or public export is permitted.
     Disabled,
@@ -191,7 +191,8 @@ pub enum SoftwareVersionState {
 struct StoredKey {
     target: DispatchTarget,
     public_key: [u8; 32],
-    material: KeyMaterial,
+    material: Option<KeyMaterial>,
+    retired_permanently: bool,
     status: SoftwareVersionState,
     issued_order: u64,
 }
@@ -287,16 +288,22 @@ impl SoftwareProvider {
         if request.feature_revision() != REVISION || request.protocol_revision() != PROTOCOL {
             return Err(denied(ProviderErrorKind::UnverifiedCapability));
         }
-        let record = keys.records.get(request.logical_key())
+        let record = keys
+            .records
+            .get(request.logical_key())
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         // Invalidate dispatch when lifecycle state changed during policy,
         // including Disable -> Enable on the same exact version.
         if request.resolution_epoch() != Some(record.generation) {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
         }
-        let version = request.target().provider_version()
+        let version = request
+            .target()
+            .provider_version()
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
-        let entry = record.versions.get(version)
+        let entry = record
+            .versions
+            .get(version)
             .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
         if &entry.target != request.target() {
             return Err(denied(ProviderErrorKind::UnsupportedVersionAssurance));
@@ -431,7 +438,8 @@ impl KeyProvider for SoftwareProvider {
                 self.namespace.clone(),
                 reference.logical_key().clone(),
                 key.target.clone(),
-            ).with_resolution_epoch(record.generation))
+            )
+            .with_resolution_epoch(record.generation))
         })
     }
 
@@ -459,7 +467,11 @@ impl KeyProvider for SoftwareProvider {
                 .map_err(|_| denied(ProviderErrorKind::Unavailable))?;
             let entry = self.checked_entry(request, &keys)?;
             let mut signature = None;
-            entry.material.with_exposed(|secret| {
+            let material = entry
+                .material
+                .as_ref()
+                .ok_or_else(|| denied(ProviderErrorKind::AuthorizationDenied))?;
+            material.with_exposed(|secret| {
                 if let Ok(seed) = <&[u8; 32]>::try_from(secret) {
                     let signer = SigningKey::from_bytes(seed);
                     signature = Some(signer.sign(message).to_bytes().to_vec());

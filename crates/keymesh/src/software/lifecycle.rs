@@ -278,7 +278,8 @@ impl SoftwareProvider {
                     version: version.clone(),
                 },
                 public_key,
-                material,
+                material: Some(material),
+                retired_permanently: false,
                 status: SoftwareVersionState::Active,
                 issued_order: generation,
             },
@@ -497,6 +498,9 @@ impl SoftwareProvider {
         }
         if let Some(previous) = record.versions.get_mut(prior_version) {
             previous.status = SoftwareVersionState::Retired;
+            previous.retired_permanently = true;
+            // Drop and zeroize the retired seed; exact historical verification uses public bytes.
+            previous.material = None;
         }
         record.versions.insert(version.clone(), stored);
         record.active = Some(version.clone());
@@ -535,11 +539,14 @@ impl SoftwareProvider {
         version: &ProviderVersionId,
         action: SoftwareTransitionAction,
     ) -> Result<(SoftwareVersionState, SoftwareVersionState), ProviderError> {
-        let prior = record
+        let entry = record
             .versions
             .get(version)
-            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?
-            .status;
+            .ok_or_else(|| denied(ProviderErrorKind::UnsupportedVersionAssurance))?;
+        let prior = entry.status;
+        if matches!(action, SoftwareTransitionAction::Enable) && entry.retired_permanently {
+            return Err(denied(ProviderErrorKind::AuthorizationDenied));
+        }
         let next = match (prior, action) {
             (
                 SoftwareVersionState::Active | SoftwareVersionState::Retired,

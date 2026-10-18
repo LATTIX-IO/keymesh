@@ -115,9 +115,10 @@ enforcement remain KM-05/06 and later increments. The crate is still
 
 A separately host-authorized `rotate` operation mints a fresh
 CSPRNG-backed Ed25519 version and atomically updates the sole active
-pointer, retaining exact historical versions for policy-approved
-verification. Version state transitions `Disable`, `Enable` and
-`ScheduleDelete` are generation-CAS checked; exact-version `purge`
+pointer, retaining exact historical public keys for policy-approved
+verification while immediately zeroizing retired signing seeds. Version state transitions `Disable`, `Enable` and
+`ScheduleDelete` are generation-CAS checked; `Enable` never restores a
+previously retired signing version. Exact-version `purge`
 erases the selected Rust-owned seed. Mutating lifecycle requests never
 accept Active/Latest selectors.
 

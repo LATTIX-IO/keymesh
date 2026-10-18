@@ -14,8 +14,9 @@ certificate, hardware-backed custody or crates.io publication is implied.
    `ProviderResourceId` and `ProviderVersionId`; material and public key
    never change for that identity. The newest version has its own metadata
    `latest`, which is **not** a synonym for an enabled `active` version.
-3. At most one version per logical key is `Active`. A rotation retires the
-   previous active version, creates a new independently seeded one, and
+3. At most one version per logical key is `Active`. A rotation permanently
+   retires the prior version from signing, drops (zeroizes) that version's
+   private signing seed, creates an independently seeded successor, and
    commits an atomic active-pointer change under the write lock.
 4. Every lifecycle mutation is authorized by `SoftwareLifecycleGate` before
    randomness or state changes and compares the caller's observed
@@ -54,7 +55,7 @@ certificate, hardware-backed custody or crates.io publication is implied.
 | Active | Rotate | Retired + new Active | Exact current reference; matching CAS generation; cap available; Permit |
 | Active | Disable | Disabled | Exact target, matching generation, Permit; active cleared |
 | Retired | Disable | Disabled | Exact target, matching generation, Permit |
-| Disabled | Enable | Active | No other active version; matching generation, Permit |
+| Disabled | Enable | Active | Version was never retired; no other active version; matching generation, Permit |
 | Retired | ScheduleDelete | PendingDeletion | Matching generation, Permit |
 | Disabled | ScheduleDelete | PendingDeletion | Matching generation, Permit |
 | Any existing state | Purge exact | Absent (that version) | Exact native version, independently authorized Permit; never an alias |
@@ -68,11 +69,13 @@ available for compatibility, but hosts should disable first.
 
 A retired version cannot sign. Its public verification key and signed
 historical evidence remain accessible only when the host permits the
-exact-key verification request. Retired secret material remains in the
-bounded, zeroizing process-owned allocation until explicitly purged.
-Enable from Disabled requires **no other active version**, preventing
-two concurrently active signing keys. PendingDeletion cannot be
-re-enabled in this increment.
+exact-key verification request. Rotation immediately drops (zeroizes) the
+retired version's Rust-owned secret material and retains public verification
+metadata. Disable preserves permanent-retirement provenance, so a rotated-out
+version cannot be re-enabled via Retired -> Disabled -> Active even after the
+successor is disabled. Enable from Disabled requires that the version was
+**never retired** and no other active version exists. PendingDeletion cannot
+be re-enabled in this increment.
 
 ## Process-local storage and limits
 
@@ -132,8 +135,9 @@ The Rust tests exercise:
 - Concurrent CAS rotations of the same observed generation, one
   success/no double active; pending policy followed by disable causes
   subsequent rotation to fail. No mutation on stale revisions.
-- Active/Retired/Disabled/PendingDeletion state transitions, invalid
-  re-enablement, no double active, exact-version purge and key-name
+- Active/Retired/Disabled/PendingDeletion state transitions, irreversible
+  signing retirement after disable/enable sequences, no double active,
+  exact-version purge and key-name
   reuse without old material resurrection.
 - Credential-free exact tenant/provider/operation binding and
   independent policy Deny/Indeterminate/Error fail-closed behavior.

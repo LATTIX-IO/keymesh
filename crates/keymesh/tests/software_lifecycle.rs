@@ -655,6 +655,54 @@ fn pending_rotate_fails_cas_after_concurrent_disable() {
 }
 
 #[test]
+fn retired_version_cannot_be_reactivated_after_successor_is_disabled() {
+    let f = Fixture::new();
+    let original = f.create();
+    let signed = f
+        .signature(original.reference(), b"historical")
+        .unwrap_or_else(|e| panic!("{e}"));
+    let rotated = f
+        .rotate(original.reference(), f.snapshot().generation(), &f.permit)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        f.verified(original.reference(), b"historical", &signed)
+            .unwrap_or_else(|e| panic!("{e}"))
+    );
+    let retired_disabled = f
+        .transition(
+            original.reference(),
+            f.snapshot().generation(),
+            SoftwareTransitionAction::Disable,
+            &f.permit,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    let successor_disabled = f
+        .transition(
+            rotated.created().reference(),
+            retired_disabled.generation(),
+            SoftwareTransitionAction::Disable,
+            &f.permit,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(f.snapshot().active().is_none());
+    rejected(
+        f.transition(
+            original.reference(),
+            successor_disabled.generation(),
+            SoftwareTransitionAction::Enable,
+            &f.permit,
+        ),
+        ProviderErrorKind::AuthorizationDenied,
+    );
+    assert_eq!(f.snapshot().generation(), successor_disabled.generation());
+    assert!(f.snapshot().active().is_none());
+    rejected(
+        f.signature(original.reference(), b"no-resurrection"),
+        ProviderErrorKind::AuthorizationDenied,
+    );
+}
+
+#[test]
 fn invalid_reenable_of_retired_version_cannot_displace_new_active_version() {
     let f = Fixture::new();
     let old = f.create();
@@ -766,7 +814,6 @@ fn snapshots_and_receipts_redact_structured_key_metadata_by_default() {
     }
 }
 
-
 #[test]
 fn exact_version_policy_pending_is_invalidated_by_disable_enable_state_aba() {
     let f = Fixture::new();
@@ -775,31 +822,47 @@ fn exact_version_policy_pending_is_invalidated_by_disable_enable_state_aba() {
     permit_after_pause.pause.store(true, Ordering::Release);
     let intent = intent(CryptoOperation::SignMessage, 3);
     let trace = CorrelationId::parse("km09-exact-aba").unwrap_or_else(|e| panic!("{e}"));
-    let future = execute_checked(f.provider.as_ref(), &permit_after_pause, OperationRequest {
-        scope: &f.scope,
-        reference: original.reference(),
-        host_assurance: &f.host,
-        intent: &intent,
-        input: OperationInput::Message {
-            bytes: b"abc", authenticator: None,
+    let future = execute_checked(
+        f.provider.as_ref(),
+        &permit_after_pause,
+        OperationRequest {
+            scope: &f.scope,
+            reference: original.reference(),
+            host_assurance: &f.host,
+            intent: &intent,
+            input: OperationInput::Message {
+                bytes: b"abc",
+                authenticator: None,
+            },
+            correlation: &trace,
         },
-        correlation: &trace,
-    });
+    );
     let mut future = Box::pin(future);
     let mut cx = Context::from_waker(Waker::noop());
     assert!(matches!(future.as_mut().poll(&mut cx), Poll::Pending));
-    let disabled = f.transition(
-        original.reference(), f.snapshot().generation(),
-        SoftwareTransitionAction::Disable, &f.permit,
-    ).unwrap_or_else(|e| panic!("{e}"));
-    f.transition(original.reference(), disabled.generation(),
-        SoftwareTransitionAction::Enable, &f.permit)
+    let disabled = f
+        .transition(
+            original.reference(),
+            f.snapshot().generation(),
+            SoftwareTransitionAction::Disable,
+            &f.permit,
+        )
         .unwrap_or_else(|e| panic!("{e}"));
+    f.transition(
+        original.reference(),
+        disabled.generation(),
+        SoftwareTransitionAction::Enable,
+        &f.permit,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
     permit_after_pause.pause.store(false, Ordering::Release);
-    rejected(match future.as_mut().poll(&mut cx) {
-        Poll::Ready(result) => result,
-        Poll::Pending => panic!("held sign did not finish"),
-    }, ProviderErrorKind::UnsupportedVersionAssurance);
+    rejected(
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(result) => result,
+            Poll::Pending => panic!("held sign did not finish"),
+        },
+        ProviderErrorKind::UnsupportedVersionAssurance,
+    );
     assert_eq!(permit_after_pause.operation_calls.load(Ordering::SeqCst), 1);
     // A newly resolved request can sign, but a pre-state-change Permit cannot.
     assert!(f.signature(original.reference(), b"abc").is_ok());
@@ -809,20 +872,25 @@ fn exact_version_policy_pending_is_invalidated_by_disable_enable_state_aba() {
 fn latest_alias_verification_does_not_switch_versions_during_policy_wait() {
     let f = Fixture::new();
     let original = f.create();
-    let signed = f.signature(original.reference(), b"abc")
+    let signed = f
+        .signature(original.reference(), b"abc")
         .unwrap_or_else(|e| panic!("{e}"));
     let latest = f.alias(KeySelector::Latest);
     let gate = Gate::permit();
     gate.pause.store(true, Ordering::Release);
     let verify = intent(CryptoOperation::VerifyMessage, 3);
-    let trace = CorrelationId::parse("km09-latest-race")
-        .unwrap_or_else(|e| panic!("{e}"));
-    let mut pending = Box::pin(execute_checked(f.provider.as_ref(), &gate,
+    let trace = CorrelationId::parse("km09-latest-race").unwrap_or_else(|e| panic!("{e}"));
+    let mut pending = Box::pin(execute_checked(
+        f.provider.as_ref(),
+        &gate,
         OperationRequest {
-            scope: &f.scope, reference: &latest, host_assurance: &f.host,
+            scope: &f.scope,
+            reference: &latest,
+            host_assurance: &f.host,
             intent: &verify,
             input: OperationInput::Message {
-                bytes: b"abc", authenticator: Some(&signed),
+                bytes: b"abc",
+                authenticator: Some(&signed),
             },
             correlation: &trace,
         },
@@ -832,15 +900,19 @@ fn latest_alias_verification_does_not_switch_versions_during_policy_wait() {
     f.rotate(original.reference(), f.snapshot().generation(), &f.permit)
         .unwrap_or_else(|e| panic!("{e}"));
     gate.pause.store(false, Ordering::Release);
-    rejected(match pending.as_mut().poll(&mut cx) {
-        Poll::Ready(result) => result,
-        Poll::Pending => panic!("stale Latest read did not finish"),
-    }, ProviderErrorKind::UnsupportedVersionAssurance);
+    rejected(
+        match pending.as_mut().poll(&mut cx) {
+            Poll::Ready(result) => result,
+            Poll::Pending => panic!("stale Latest read did not finish"),
+        },
+        ProviderErrorKind::UnsupportedVersionAssurance,
+    );
     // Host may separately permit historical verification using exact old ref.
-    assert!(f.verified(original.reference(), b"abc", &signed)
-        .unwrap_or_else(|e| panic!("{e}")));
+    assert!(
+        f.verified(original.reference(), b"abc", &signed)
+            .unwrap_or_else(|e| panic!("{e}"))
+    );
 }
-
 
 #[test]
 fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
@@ -853,46 +925,71 @@ fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
         assert!(before.generation() >= last_generation);
         assert!(before.versions().len() <= MAX_SOFTWARE_VERSIONS_PER_KEY);
         assert_eq!(
-            before.versions().iter()
-                .filter(|v| v.status() == SoftwareVersionState::Active).count(),
+            before
+                .versions()
+                .iter()
+                .filter(|v| v.status() == SoftwareVersionState::Active)
+                .count(),
             1,
         );
         assert_eq!(before.active(), Some(&active));
         for (index, version) in before.versions().iter().enumerate() {
-            assert!(before.versions().iter().skip(index + 1)
-                .all(|other| version.reference() != other.reference()));
+            assert!(
+                before
+                    .versions()
+                    .iter()
+                    .skip(index + 1)
+                    .all(|other| version.reference() != other.reference())
+            );
         }
         // Every fourth iteration exercises a stop/restart transition.
         if step % 4 == 0 {
-            let disabled = f.transition(
-                &active, before.generation(),
-                SoftwareTransitionAction::Disable, &f.permit,
-            ).unwrap_or_else(|e| panic!("{e}"));
+            let disabled = f
+                .transition(
+                    &active,
+                    before.generation(),
+                    SoftwareTransitionAction::Disable,
+                    &f.permit,
+                )
+                .unwrap_or_else(|e| panic!("{e}"));
             assert!(f.snapshot().active().is_none());
-            let enabled = f.transition(
-                &active, disabled.generation(),
-                SoftwareTransitionAction::Enable, &f.permit,
-            ).unwrap_or_else(|e| panic!("{e}"));
+            let enabled = f
+                .transition(
+                    &active,
+                    disabled.generation(),
+                    SoftwareTransitionAction::Enable,
+                    &f.permit,
+                )
+                .unwrap_or_else(|e| panic!("{e}"));
             assert_eq!(f.snapshot().active(), Some(&active));
             assert!(enabled.generation() > disabled.generation());
         }
-        let signature = f.signature(&active, b"historic")
+        let signature = f
+            .signature(&active, b"historic")
             .unwrap_or_else(|e| panic!("{e}"));
         let current_generation = f.snapshot().generation();
-        let rotated = f.rotate(&active, current_generation, &f.permit)
+        let rotated = f
+            .rotate(&active, current_generation, &f.permit)
             .unwrap_or_else(|e| panic!("{e}"));
-        assert!(f.verified(&active, b"historic", &signature)
-            .unwrap_or_else(|e| panic!("{e}")));
-        rejected(f.signature(&active, b"no longer active"),
-            ProviderErrorKind::AuthorizationDenied);
+        assert!(
+            f.verified(&active, b"historic", &signature)
+                .unwrap_or_else(|e| panic!("{e}"))
+        );
+        rejected(
+            f.signature(&active, b"no longer active"),
+            ProviderErrorKind::AuthorizationDenied,
+        );
         active = rotated.created().reference().clone();
         last_generation = rotated.evidence().generation();
         let after = f.snapshot();
         assert!(after.generation() > before.generation());
         assert_eq!(after.active(), Some(&active));
         assert_eq!(
-            after.versions().iter()
-                .filter(|v| v.status() == SoftwareVersionState::Active).count(),
+            after
+                .versions()
+                .iter()
+                .filter(|v| v.status() == SoftwareVersionState::Active)
+                .count(),
             1,
         );
     }

@@ -423,8 +423,7 @@ fn duplicate_keys_and_invalid_native_selectors_fail_closed() {
         f.scope.namespace().clone(),
         f.logical.clone(),
         KeySelector::StableResource(
-            keymesh::ProviderResourceId::parse("memory:unbound")
-                .unwrap_or_else(|e| panic!("{e}")),
+            keymesh::ProviderResourceId::parse("memory:unbound").unwrap_or_else(|e| panic!("{e}")),
         ),
     );
     assert_predispatch(
