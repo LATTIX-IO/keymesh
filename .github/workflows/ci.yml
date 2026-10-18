@@ -95,6 +95,9 @@ jobs:
           RUSTDOCFLAGS: -D warnings
         run: cargo doc --workspace --all-features --no-deps --locked
 
+      - name: Verify manual release preview script in PR CI
+        run: bash scripts/release_candidate_preflight.sh
+
       - name: Install supply-chain tools
         run: |
           cargo install --locked cargo-audit

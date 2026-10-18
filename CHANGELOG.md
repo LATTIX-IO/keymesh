@@ -14,7 +14,10 @@ The project follows Semantic Versioning once its public API reaches a stable con
 
 ### Security
 
-## Pre-release alpha scope (candidate; not yet published)
+## First functional prerelease scope (`0.2.0-alpha.1` candidate; not yet published)
+
+Published crate `0.1.0` (2026-10-07) was a namespace placeholder.
+The functional SDK requires a distinct approved version and owner approval.
 
 - Typed provider, tenant and key identity with version-safe URI encoding.
 - Explicit provider registry, capability negotiation and fail-closed dispatch.

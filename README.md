@@ -8,14 +8,19 @@ Project website: https://lattix.io
 
 ## Status
 
-**Unreleased bootstrap.** Typed key identity/version, URI, crypto taxonomy,
+**Current functional SDK not yet published.** The earlier `keymesh 0.1.0`
+crate was a namespace placeholder published 2026-10-07; it does not contain
+the current implementation. Proposed next functional prerelease is
+`0.2.0-alpha.1` subject to maintainer approval. Typed key identity/version,
+URI, crypto taxonomy,
 checked async provider operations, explicit capability-based provider routing,
 and bounded sensitive-material/credential callback contracts are implemented
 and tested. An explicitly opted-in ephemeral Ed25519 software provider can
 perform real local message signing. No live KMS/HSM,
 IAM system, independent assurance attestation or production credential store
 is included. Public APIs are not release-stable and the `keymesh` crate
-remains **non-publishable** until separate release approval.
+remains **non-publishable** until separate release approval. The already
+published placeholder does not supply this repository's public APIs.
 
 ## Security and key-versioning design (KM-01)
 
