@@ -12,6 +12,10 @@ use keymesh::{
     SoftwareRotateRequest, SoftwareTransitionAction, SoftwareTransitionRequest,
     SoftwareVersionState, VersionModel, VersionRequirement, execute_checked,
 };
+use keymesh::{
+    DecisionPolicyGate, PolicyAuditSink, PolicyDecision, PolicyDecisionEvidence,
+    PolicyRequirements, execute_checked_with_decision,
+};
 use std::future::{Future, poll_fn};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -994,4 +998,168 @@ fn deterministic_lifecycle_sequence_preserves_invariants_after_each_action() {
         );
     }
     assert_eq!(f.snapshot().versions().len(), 13);
+}
+
+struct DecisionGate {
+    verdict: PolicyVerdict,
+    requirements: PolicyRequirements,
+    fail: bool,
+    calls: AtomicUsize,
+}
+impl DecisionGate {
+    fn new(verdict: PolicyVerdict, requirements: PolicyRequirements) -> Self {
+        Self {
+            verdict,
+            requirements,
+            fail: false,
+            calls: AtomicUsize::new(0),
+        }
+    }
+}
+impl DecisionPolicyGate for DecisionGate {
+    fn decide<'a>(&'a self, _: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyDecision> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        Box::pin(async move {
+            if self.fail {
+                Err(ProviderError::not_dispatched(
+                    ProviderErrorKind::Unavailable,
+                ))
+            } else {
+                Ok(PolicyDecision {
+                    verdict: self.verdict,
+                    requirements: self.requirements.clone(),
+                    policy_revision: Some(
+                        CorrelationId::parse("km10-policy-v1").unwrap_or_else(|e| panic!("{e}")),
+                    ),
+                })
+            }
+        })
+    }
+}
+struct DecisionSink {
+    calls: AtomicUsize,
+    satisfied: AtomicBool,
+    fail: bool,
+}
+impl DecisionSink {
+    fn new(fail: bool) -> Self {
+        Self {
+            calls: AtomicUsize::new(0),
+            satisfied: AtomicBool::new(false),
+            fail,
+        }
+    }
+}
+impl PolicyAuditSink for DecisionSink {
+    fn record(&self, evidence: &PolicyDecisionEvidence<'_>) -> Result<(), ProviderError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.satisfied
+            .store(evidence.requirements_satisfied, Ordering::SeqCst);
+        assert!(format!("{evidence:?}").contains("<redacted>"));
+        if self.fail {
+            Err(ProviderError::not_dispatched(
+                ProviderErrorKind::Unavailable,
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+fn execute_with_decision(
+    fixture: &Fixture,
+    reference: &KeyRef,
+    gate: &DecisionGate,
+    sink: Option<&DecisionSink>,
+) -> Result<keymesh::OperationCompletion, ProviderError> {
+    let i = intent(CryptoOperation::SignMessage, 3);
+    let trace = CorrelationId::parse("km10-request").unwrap_or_else(|e| panic!("{e}"));
+    drive(execute_checked_with_decision(
+        fixture.provider.as_ref(),
+        gate,
+        sink.map(|s| s as &dyn PolicyAuditSink),
+        OperationRequest {
+            scope: &fixture.scope,
+            reference,
+            host_assurance: &fixture.host,
+            intent: &i,
+            input: OperationInput::Message {
+                bytes: b"abc",
+                authenticator: None,
+            },
+            correlation: &trace,
+        },
+    ))
+}
+#[test]
+fn km10_policy_requirements_fail_closed_without_dispatch() {
+    let f = Fixture::new();
+    let key = f.create();
+    let gate = DecisionGate::new(
+        PolicyVerdict::Permit,
+        PolicyRequirements {
+            algorithm: None,
+            min_version: Some(VersionRequirement::MaterialRevision),
+            protection: Some(ProtectionClass::Hsm),
+        },
+    );
+    let sink = DecisionSink::new(false);
+    rejected(
+        execute_with_decision(&f, key.reference(), &gate, Some(&sink)),
+        ProviderErrorKind::PolicyDenied,
+    );
+    assert_eq!(gate.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
+    assert!(!sink.satisfied.load(Ordering::SeqCst));
+    // Fail-closed: no operation used the key. A permitted request still signs.
+    assert!(f.signature(key.reference(), b"abc").is_ok());
+}
+#[test]
+fn km10_denials_and_audit_failures_are_not_dispatched() {
+    let f = Fixture::new();
+    let key = f.create();
+    for verdict in [PolicyVerdict::Deny, PolicyVerdict::Indeterminate] {
+        let gate = DecisionGate::new(verdict, PolicyRequirements::default());
+        let sink = DecisionSink::new(false);
+        rejected(
+            execute_with_decision(&f, key.reference(), &gate, Some(&sink)),
+            if verdict == PolicyVerdict::Deny {
+                ProviderErrorKind::PolicyDenied
+            } else {
+                ProviderErrorKind::PolicyIndeterminate
+            },
+        );
+        assert_eq!(sink.calls.load(Ordering::SeqCst), 1);
+    }
+    let gate = DecisionGate::new(PolicyVerdict::Permit, PolicyRequirements::default());
+    rejected(
+        execute_with_decision(&f, key.reference(), &gate, Some(&DecisionSink::new(true))),
+        ProviderErrorKind::PolicyIndeterminate,
+    );
+    let mut unavailable = DecisionGate::new(PolicyVerdict::Permit, PolicyRequirements::default());
+    unavailable.fail = true;
+    rejected(
+        execute_with_decision(&f, key.reference(), &unavailable, None),
+        ProviderErrorKind::PolicyIndeterminate,
+    );
+}
+#[test]
+fn km10_exact_policy_acceptance_preserves_operation_evidence() {
+    let f = Fixture::new();
+    let key = f.create();
+    let gate = DecisionGate::new(
+        PolicyVerdict::Permit,
+        PolicyRequirements {
+            algorithm: Some(AlgorithmProfile::EdDsa {
+                variant: EdDsaVariant::Ed25519,
+            }),
+            min_version: Some(VersionRequirement::ProviderVersion),
+            protection: Some(ProtectionClass::Software),
+        },
+    );
+    let sink = DecisionSink::new(false);
+    let result = execute_with_decision(&f, key.reference(), &gate, Some(&sink))
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(result.evidence.outcome, OperationState::ConfirmedSuccess);
+    assert!(matches!(result.output, ProviderOutput::Signature(_)));
+    assert!(sink.satisfied.load(Ordering::SeqCst));
 }
