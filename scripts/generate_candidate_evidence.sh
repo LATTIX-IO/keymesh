@@ -19,6 +19,12 @@ mkdir -p target/release-evidence
 cargo package -p keymesh --locked --allow-dirty --no-verify
 ARCHIVE="target/package/keymesh-$VERSION.crate"
 test -s "$ARCHIVE"
+for required in README.md LICENSE-APACHE LICENSE-MIT; do
+  if ! tar -tzf "$ARCHIVE" | grep -Fxq "keymesh-$VERSION/$required"; then
+    echo "Packaged crate lacks $required" >&2
+    exit 1
+  fi
+done
 cp "$ARCHIVE" "target/release-evidence/keymesh-$VERSION.crate"
 # Build from resolved exact Cargo metadata and the locked dependency graph.
 # SOURCE_DATE_EPOCH stabilizes the BOM timestamp and omits a random serial.

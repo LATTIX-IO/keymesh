@@ -1,29 +1,45 @@
 # keymesh
 
-`keymesh` is the planned provider-neutral key-management Rust library maintained
-by Lattix Technologies Corp.
+Provider-neutral typed key-provider interface for Rust, maintained by Lattix
+Technologies Corp. Repository: https://github.com/LATTIX-IO/keymesh.
 
-Repository: https://github.com/LATTIX-IO/keymesh
+## Release status
 
-## Status
+The crates.io version **0.1.0** published on 2026-10-07 was a namespace
+placeholder, not this functional implementation. This repository's SDK is
+**not yet published**; the tentative functional prerelease is
+**0.2.0-alpha.1**, pending authenticated registry-owner approval. Its
+manifest retains `publish = false` until an expressly approved release PR.
 
-**Unreleased bootstrap.** A runtime-neutral provider interface, explicit
-provider registry, and bounded secret/credential callback contracts exist, but
-no production provider adapter, hardware-backed cryptography or live credential
-service is included. The `software-provider` feature enables only ephemeral,
-software-only Ed25519 signing/verification without HSM fallback. The crate explicitly declares `publish = false`; nothing in this package
-should be interpreted as a published, security-assessed key-management library.
+## Supported behavior (software-only alpha scope)
 
-See the [repository README](../../README.md) for the release-safety guard,
-non-publishing manual preview, development commands, and future release approval
-requirements.
+- Typed key/provider/tenant identities, URI references and exact-version
+  binding/capability admission through the checked asynchronous dispatcher.
+- Explicitly enrolled `software-provider` feature (off by default) enables
+  local process-memory Ed25519 generation, signing, verification and
+  public-key export, with independent host-supplied policy authorization.
+- Immutable version rotation, irreversible retirement with zeroized signing
+  seed, historical exact-reference verification, CAS lifecycle transitions,
+  typed policy decisions and optional fail-closed pre-dispatch audit callbacks.
+- Independent packaged-crate consumer tested on Rust stable and Rust 1.85.
+
+## Important limitations
+
+No durable keys, production HSM/KMS/PKCS#11 implementation, live IAM, verified
+hardware custody, FIPS validation, persistent audit log or provider fallback.
+Keys are lost when the provider is dropped or the process terminates.
+A host-generated `HostScope` is not proof of authenticated tenant identity.
+Example allow/deny policy gates are for integration tests, not production IAM.
+
+Run `bash scripts/test_packaged_consumer.sh` from the repository root to
+validate the locally packaged crate. The protected workflow also creates
+candidate CycloneDX SBOM and Sigstore/GitHub attestations without publishing.
+
+For the full security model and release requirements, see:
+https://github.com/LATTIX-IO/keymesh/blob/main/THREAT_MODEL.md
+and https://github.com/LATTIX-IO/keymesh/blob/main/docs/releases/first-alpha.md.
 
 ## License
 
-Licensed under either Apache-2.0 or MIT, at your option.
-
-KM-09 extends the optional software provider with immutable Ed25519
-versions, CAS-controlled rotation, Enable/Disable/ScheduleDelete and
-host-policy-authorized exact-version purge, plus historical verification.
-All in-memory keys are lost at process restart. See the
-[KM-09 lifecycle contract](../../docs/specs/software-lifecycle-v1.md).
+Dual-licensed under Apache-2.0 or MIT at your option. See `LICENSE-APACHE`
+and `LICENSE-MIT`, included in the crate archive.
