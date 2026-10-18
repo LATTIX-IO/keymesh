@@ -129,3 +129,31 @@ OS-CSPRNG generated private material remains under KM-07 zeroization;
 no key bytes enter logs, audit objects, serialization or PR fixtures.
 Provider registry must be explicitly enrolled; feature-off builds
 remain available. This work is not FIPS/HSM/KMS certification.
+
+
+## KM-09 immutable-version state machine and alias binding (FOSS-410)
+
+The optional software-provider maintains independent immutable
+version targets and Rust-owned zeroizing private material with
+a sole-active-pointer invariant, global monotonic process-local
+generation and per-logical mutation CAS. KM-05 PreparedDispatch
+now preserves the original Active/Latest selector exclusively for
+a second adapter-side alias check after asynchronous policy. Native
+sign/verify still receive an exactly pinned provider version.
+
+Threats covered: stale alias/key substitution while policy is pending,
+concurrent loss or displacement of active key, cross-tenant/provider
+binding, unauthorized lifecycle mutation, HSM-to-software downgrade,
+bounded historical secret retention, disabled and pending-deletion
+cryptographic denial, preserving old signature verification, and
+identity resurrection attempts after exact purge. Every state mutation
+requires host lifecycle Permit with generation validation before and
+after asynchronous policy under the final state lock.
+
+Integration tests in tests/software_lifecycle.rs exercise transition
+states, invalid transitions, wrong generations, concurrent rotation,
+policy-pending alias and rotate races, 32-version retention bound,
+redacted lifecycle metadata, old signatures and post-purge recreation.
+KM-08 RFC 8032 KATs and prior KM-05/06/07 regressions remain in CI.
+No persistent audit ledger, trusted clock, hardware KMS, multi-process
+consistency or independent cryptographic custody attestation is claimed.

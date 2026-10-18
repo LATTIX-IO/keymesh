@@ -206,6 +206,8 @@ pub struct ResolvedKey {
     logical_key: LogicalKeyId,
     target: DispatchTarget,
     observed_material_revision: Option<MaterialRevisionId>,
+    // Adapter-owned optimistic revision used only for post-policy staleness.
+    resolution_epoch: Option<u64>,
 }
 impl ResolvedKey {
     /// Create a provider-specific resolution proposal; never pass an unresolved alias.
@@ -221,6 +223,7 @@ impl ResolvedKey {
             logical_key,
             target,
             observed_material_revision: None,
+            resolution_epoch: None,
         }
     }
     /// Attach observational provider metadata; does NOT upgrade dispatch assurance.
@@ -228,6 +231,18 @@ impl ResolvedKey {
         self.observed_material_revision = Some(observed);
         self
     }
+    /// Attach an adapter-local, monotonically increasing resolution epoch.
+    /// It is NOT material-revision assurance; the adapter must recheck it
+    /// at native dispatch after any asynchronous policy evaluation.
+    pub fn with_resolution_epoch(mut self, epoch: u64) -> Self {
+        self.resolution_epoch = Some(epoch);
+        self
+    }
+    /// Adapter-local snapshot generation, not attested key material.
+    pub fn resolution_epoch(&self) -> Option<u64> {
+        self.resolution_epoch
+    }
+
     /// The resolved native dispatch target, never an alias.
     pub fn dispatch_target(&self) -> &DispatchTarget {
         &self.target
@@ -283,6 +298,10 @@ impl<'a> BoundKey<'a> {
     /// Concrete native dispatch target; no aliases or provider auto-selection.
     pub fn dispatch_target(&self) -> &'a DispatchTarget {
         &self.resolved.target
+    }
+    /// Adapter-local generation sampled with the immutable resolved target.
+    pub fn resolution_epoch(&self) -> Option<u64> {
+        self.resolved.resolution_epoch
     }
     /// Provider-reported assurance level of this target.
     pub fn assurance(&self) -> BindingAssurance {

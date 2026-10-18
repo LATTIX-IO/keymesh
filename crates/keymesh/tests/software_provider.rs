@@ -68,7 +68,12 @@ impl SoftwareLifecycleGate for Gate {
         self.lifecycle_calls.fetch_add(1, Ordering::SeqCst);
         assert!(matches!(
             context.action,
-            SoftwareLifecycleAction::Generate | SoftwareLifecycleAction::Purge
+            SoftwareLifecycleAction::Generate
+                | SoftwareLifecycleAction::Purge
+                | SoftwareLifecycleAction::Rotate
+                | SoftwareLifecycleAction::Disable
+                | SoftwareLifecycleAction::Enable
+                | SoftwareLifecycleAction::ScheduleDelete
         ));
         let pause = Arc::clone(&self.pause_create);
         Box::pin(async move {
@@ -410,8 +415,19 @@ fn duplicate_keys_and_invalid_native_selectors_fail_closed() {
         f.logical.clone(),
         KeySelector::Active,
     );
+    // KM-09 makes Active a valid read-only resolution alias. The adapter
+    // still receives only an immutable target and rechecks post-policy state.
+    assert!(sign(&f, &alias, b"message").is_ok());
+    let stable = KeyRef::new(
+        f.scope.provider().clone(),
+        f.scope.namespace().clone(),
+        f.logical.clone(),
+        KeySelector::StableResource(
+            keymesh::ProviderResourceId::parse("memory:unbound").unwrap_or_else(|e| panic!("{e}")),
+        ),
+    );
     assert_predispatch(
-        sign(&f, &alias, b"message"),
+        sign(&f, &stable, b"message"),
         ProviderErrorKind::UnsupportedVersionAssurance,
     );
     assert_predispatch(

@@ -111,6 +111,32 @@ secret transmission, or real hardware attestation. Provider adapters and
 enforcement remain KM-05/06 and later increments. The crate is still
 `publish = false`.
 
+## KM-09: version-safe logical lifecycle and atomic rotation
+
+A separately host-authorized `rotate` operation mints a fresh
+CSPRNG-backed Ed25519 version and atomically updates the sole active
+pointer, retaining exact historical public keys for policy-approved
+verification while immediately zeroizing retired signing seeds. Version state transitions `Disable`, `Enable` and
+`ScheduleDelete` are generation-CAS checked; `Enable` never restores a
+previously retired signing version. Exact-version `purge`
+erases the selected Rust-owned seed. Mutating lifecycle requests never
+accept Active/Latest selectors.
+
+Read-only `Active`/`Latest` aliases resolve to concrete immutable
+provider versions before mandatory KM-05 policy. Native sign/verify
+rechecks original alias and pinned target after policy, so concurrent
+rotate/disable cannot retarget a signature. Bounded memory: 32 retained
+versions per logical key, 1024 per provider. Restart loses all keys
+and receipt state. None of this constitutes a durable key store,
+hosted IAM, HSM failover or external immutable audit log.
+
+```sh
+cargo run --locked -p keymesh --features software-provider --example software_rotation
+cargo test --workspace --all-features --locked
+```
+
+See [KM-09 lifecycle SDD](docs/specs/software-lifecycle-v1.md).
+
 ## KM-08: opt-in pure-Ed25519 in-memory software provider
 
 Feature `software-provider` is **disabled by default** and must be

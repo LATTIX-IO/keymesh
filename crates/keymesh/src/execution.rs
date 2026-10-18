@@ -475,6 +475,7 @@ pub async fn execute_checked(
     let prepared = PreparedDispatch {
         bound,
         intent: request.intent,
+        requested_selector: request.reference.selector(),
         correlation: request.correlation,
         feature_revision: &catalog.feature_revision,
         protocol_revision: &catalog.protocol_revision,

@@ -32,8 +32,16 @@ serde_json = "=1.0.145"
 name = "software_ed25519"
 required-features = ["software-provider"]
 
+[[example]]
+name = "software_rotation"
+required-features = ["software-provider"]
+
 [[test]]
 name = "software_provider"
+required-features = ["software-provider"]
+
+[[test]]
+name = "software_lifecycle"
 required-features = ["software-provider"]
 
 [lints]
