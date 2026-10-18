@@ -13,6 +13,7 @@ mod binding;
 mod capability;
 mod credential;
 mod execution;
+mod policy;
 mod identity;
 mod provider;
 mod registry;
@@ -48,6 +49,10 @@ pub use capability::{
 pub use execution::{
     MAX_VERIFICATION_PROOF_BYTES, OperationCompletion, OperationEvidence, OperationInput,
     OperationRequest, PolicyContext, PolicyGate, PolicyVerdict, execute_checked,
+};
+pub use policy::{
+    DecisionPolicyGate, PolicyAuditSink, PolicyDecision, PolicyDecisionEvidence,
+    PolicyRequirements, execute_checked_with_decision,
 };
 pub use provider::{
     CorrelationId, KeyProvider, OperationState, PreparedDispatch, ProtectedResultRef,
