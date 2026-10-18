@@ -1017,21 +1017,19 @@ impl DecisionGate {
     }
 }
 impl DecisionPolicyGate for DecisionGate {
-    fn decide<'a>(
-        &'a self,
-        _: &'a PolicyContext<'_>,
-    ) -> ProviderFuture<'a, PolicyDecision> {
+    fn decide<'a>(&'a self, _: &'a PolicyContext<'_>) -> ProviderFuture<'a, PolicyDecision> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Box::pin(async move {
             if self.fail {
-                Err(ProviderError::not_dispatched(ProviderErrorKind::Unavailable))
+                Err(ProviderError::not_dispatched(
+                    ProviderErrorKind::Unavailable,
+                ))
             } else {
                 Ok(PolicyDecision {
                     verdict: self.verdict,
                     requirements: self.requirements.clone(),
                     policy_revision: Some(
-                        CorrelationId::parse("km10-policy-v1")
-                            .unwrap_or_else(|e| panic!("{e}")),
+                        CorrelationId::parse("km10-policy-v1").unwrap_or_else(|e| panic!("{e}")),
                     ),
                 })
             }
@@ -1059,7 +1057,9 @@ impl PolicyAuditSink for DecisionSink {
             .store(evidence.requirements_satisfied, Ordering::SeqCst);
         assert!(format!("{evidence:?}").contains("<redacted>"));
         if self.fail {
-            Err(ProviderError::not_dispatched(ProviderErrorKind::Unavailable))
+            Err(ProviderError::not_dispatched(
+                ProviderErrorKind::Unavailable,
+            ))
         } else {
             Ok(())
         }
