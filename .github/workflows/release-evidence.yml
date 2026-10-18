@@ -86,14 +86,22 @@ jobs:
           subject-path: candidate-evidence/*.crate
           sbom-path: ${{ steps.sbom.outputs.path }}
 
-      - name: Verify GitHub-issued attestation signature
+      - name: Verify signed provenance and CycloneDX attestations
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for i in 1 2 3 4 5; do
-            if gh attestation verify candidate-evidence/*.crate --repo "$GITHUB_REPOSITORY"; then
-              exit 0
+          for predicate in https://slsa.dev/provenance/v1 https://cyclonedx.org/bom; do
+            verified=0
+            for i in 1 2 3 4 5; do
+              if gh attestation verify candidate-evidence/*.crate \
+                --repo "$GITHUB_REPOSITORY" --predicate-type "$predicate"; then
+                verified=1
+                break
+              fi
+              sleep 5
+            done
+            if [ "$verified" != 1 ]; then
+              echo "Required attestation not verified: $predicate" >&2
+              exit 1
             fi
-            sleep 5
           done
-          exit 1
