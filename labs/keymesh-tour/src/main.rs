@@ -500,7 +500,7 @@ impl Lab {
         };
         let observed = if stale {
             match self.prior_generation {
-                Some(gen) => gen,
+                Some(old_generation) => old_generation,
                 None => { println!("Run rotate once before stale-rotate."); return; }
             }
         } else {
