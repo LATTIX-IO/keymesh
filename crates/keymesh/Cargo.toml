@@ -21,7 +21,7 @@ serde = { version = "=1.0.228", features = ["derive"] }
 zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
 # Feature-gated software provider only; no default software fallback.
 ed25519-dalek = { version = "=2.2.0", default-features = false, features = ["std", "zeroize"], optional = true }
-getrandom = { version = "=0.2.17", optional = true }
+getrandom = { version = "=0.4.3", optional = true }
 
 [features]
 default = []
