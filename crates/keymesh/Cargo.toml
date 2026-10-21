@@ -16,7 +16,7 @@ readme = "README.md"
 publish = false
 
 [dependencies]
-serde = { version = "=1.0.228", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive"] }
 # RustCrypto volatile-backed zeroization; exactly pinned, default derive features disabled.
 zeroize = { version = "=1.9.0", default-features = false, features = ["alloc"] }
 # Feature-gated software provider only; no default software fallback.
